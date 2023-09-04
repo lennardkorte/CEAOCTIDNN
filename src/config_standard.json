@@ -1,0 +1,40 @@
+
+{
+    "name": "run0",
+    "group": "group0",
+    
+    "use_cuda": true,
+    "deterministic_training": true,
+    "deterministic_batching": true,    
+    
+    "model_type": "ResNet18",
+    "pretrained": true,
+    "num_out": 2,
+    "loss_function": "cross_entropy",
+    "optimizer": "Adam",
+
+    "set_percentage_cv": 80,           
+    "set_percentage_val": 20,           
+
+    "preload": false,
+    "batch_size": 128,
+    
+    "enable_wandb": false,
+    "send_final_results": true,
+    "b_logging_active": false,
+
+    "calc_train_error": true,           
+    "peak_train_error": false,
+    "calc_and_peak_test_error": false,
+    
+    "num_cv": 7,                        
+    "epochs": 50,                      
+    "learning_rate": 3e-6,
+    "early_stop_patience": 25,           
+    "early_stop_accuracy": 7,          
+    "transformations_chosen": "",       
+
+    "define_sets_manually": true,
+    "c2_or_c3": "ivoct_both_c2/",       
+    "cart_or_pol": "orig"
+}

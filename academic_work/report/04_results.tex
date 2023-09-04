@@ -1,0 +1,331 @@
+
+\chapter{Results}
+
+In the following the successful application of DA techniques is demonstrated. Hyperparameters and generalization capabilities of the trained \acrshortpl{cnn} architectures are are tested and most promising values are determined. Based on the augmentation experiments the performance of different techniques is tested. From these results, a strategy is determined and its validity proven.
+
+\section{Underlying Model}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./figures/pretesting/tabular_batch_lr.pdf}
+    \caption[Grid search initial \gls{learning-rate} with batch size]{Plot of F1-score and \acrshort{acc} for grid search of initial \gls{learning-rate} against batch size. Each line indicates a different batch size. Purple, green and yellow indicate F1-score, while red blue and gray represent the \acrshort{acc} for a batch sizes of 64, 128 and 256.}
+    \label{fig:gridsearch_lr}
+\end{figure}
+Important hyperparameters are determined by restricted grid search (see \cref{fig:gridsearch_lr}) with a coarse grid using the F1-score from simple training with validation set and an extra holdout to keep computational costs within the acceptable range. These hyperparameters are the initial \gls{learning-rate} and batch size. We test batch sizes between 64 and 256 in powers of two. The lower limit is set to prevent the loss from fluctuating excessively and the upper limits ensures rarely occurring features can be taken into account as well. Initial \glspl{learning-rate} are chosen between 0.5e-8 and 1e-5 with a step size as power of two. This results in 14 different initial \glspl{learning-rate} for each batch size. Performance measures of 42 different models that have been trained in total are plotted in a graph (see \cref{fig:gridsearch_lr}). Based on the generated generated curve, the model that performs best on the combination of both, initial \gls{learning-rate} and batch size, is picked as starting point for training. Transfer learning is used with \gls{imagenet} and a standardizes \acrshort{ivoct} data set in cartesian representation. No dropout or L2 regularization have been considered. The F1-score and \acrshort{acc} are plotted against the initial \gls{learning-rate} for each model in \cref{fig:lr_bs}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./figures/pretesting/tabular_batch_lr_loss.pdf}
+    \caption[Training loss of grid search]{Losses calculated while training with distinct initial \glspl{learning-rate} on a batch size of 128 samples. They decrease faster if the initial \gls{learning-rate} is higher and vice versa.}
+    \label{fig:lr_bs}
+\end{figure}
+We observe a similar curve for all three batch sizes. An initial \glspl{learning-rate} smaller than 3.2e-7 comes along with a decreasing performance for F1-score as well as \acrshort{acc}. Larger \glspl{learning-rate} lead to peak results before they drastically decrease the performance. It can be seen that a larger batch size tendentiously leads to increased overall performance for particularly small batch sizes, but does not differ much if initial \glspl{learning-rate} were increased.
+
+The initial \gls{learning-rate} of 3e-6 and a batch size of 128 samples is chosen from the best performing batch size in the center of the curve. This results in 19 distinct batches for each epoch. 
+% Done.
+The red line represents a well formed and slowly converging curve and belongs to the chosen initial \gls{learning-rate}.
+% Done.
+
+Early stopping has a similar effect as L2 regularization, when choosing the model with the best validation performance as final test model. Due to this reason we take the optimized hyperparameters from above and test training the ResNet with and without L2 regularization to see if it gives us any additional performance improvement. For the weight decay we choose values from 1e-4 and increase by factors of 10 until 1e-1 is reached. Our tests have shown that models perform best with only slight weight decay levels of 1e-2, returning the best \acrshort{mcc} score with slight improvement of 0.5\%.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|c|c|}
+        \hline
+        Distribution & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        resc & 0.5566 & 0.7166 & 0.6598 & 0.6366 & 0.5959 & 0.2902 \\
+        resc pad & 0.6139 & 0.6210 & 0.6634 & 0.6175 & 0.6010 & 0.2610 \\
+        resc trans & 0.6632 & 0.6577 & 0.7045 & 0.6604 & 0.6589 & 0.3356 \\
+        resc trans pad & 0.5270 & \textbf{0.7719} & 0.6956 & 0.6495 & 0.5561 & 0.3109 \\
+        norm & 0.6211 & 0.7387 & 0.6916 & \textbf{0.6799} & 0.6578 & 0.3630 \\
+        norm pad & 0.5976 & 0.7156 & 0.7024 & 0.6566 & 0.6191 & 0.3559 \\
+        std 0 & 0.5802 & 0.7167 & 0.6880 & 0.6484 & 0.6179 & 0.3145 \\
+        std 0 pad & 0.6800 & 0.6752 & 0.7095 & 0.6776 & \textbf{0.6792} & \textbf{0.3637} \\
+        std 0.5 & 0.6920 & 0.5991 & 0.7202 & 0.6455 & 0.6393 & 0.3103 \\
+        std 0.5 pad & \textbf{0.7058} & 0.6318 & 0.7362 & 0.6688 & 0.6583 & 0.3451 \\
+        std 0.5 trans & 0.6858 & 0.6176 & 0.6859 & 0.6517 & 0.6691 & 0.3171 \\
+        std 0.5 trans pad & 0.5817 & 0.6714 & 0.7067 & 0.6266 & 0.5585 & 0.2704 \\
+        std IN trans & 0.6938 & 0.6245 & 0.6990 & 0.6592 & 0.6812 & 0.3353 \\
+        \hline
+    \end{tabular}
+    \caption[Initialization and pre-training variants]{Averaged performance scores of several model initialization and pre-training variants. Pre-training variants are rescaling (resc), mean normalization (norm) or standardization (std). The mean values for standardization are either 0.0, 0.5, or congruent to those of ImageNet (IN). Padding (pad) and transfer learning (trans) may likewise result in different outcomes. Bold numbers indicate the best performance value for the respective metric.}
+    \label{tab:init_pretrain}
+\end{table}
+The same environment has been used to test if rescaling, mean normalization or standardization lead to the highest performance (see \cref{tab:init_pretrain}). Rescaling refers to transforming the intensities to a range between zero and one, while normalization sets the mean to zero and scales the image to be between minus one and one. Alternatively we may standardize our image to have a standard deviation of one \( \sigma = 1 \) and mean \( \mu = 0 \). We can use the same mean and standard deviation of \gls{imagenet} with \( \sigma = [0.229, 0.224, 0.225] \) and \( \mu = [0.485, 0.456, 0.406] \) when standardization is applied or simply standardize our data with \( \sigma = 0.25 \) and \( \mu = 0.5 \). If we standardize with \glspl{imagenet} hyperparameters, transfer learning by initializing pre-trained weights and biases may be advantageous. Otherwise they can be initialized randomly. This way it is examined if any learned \gls{imagenet} features can be transferred when training on \acrshort{ivoct} data. Note that transfer learning for mean normalized images is not considered since then the initial activations distribution seriously deviates from \gls{imagenet}. Furthermore \acrshort{2d} images may be replicated or padded to three channel tensors. Both variants are tested because it is unknown whether the model can benefit from either of them. Rescaling and transfer learning are used in the following experiments. This results in the average metrics: \acrshort{ppv} 0.6425\%, \acrshort{sens} 0.6158\%v, \acrshort{spec} 0.6144\%, F1-score 0.6236\%, \acrshort{bacc} 0.6151\% and \acrshort{mcc} 0.2344\%. Considering the validation accuracy we observe, that an early stopping patience of 30 epochs suffices and no improvement can be expected from continued training.
+
+% Done.
+
+\section{Generalization with Validation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./figures/pretesting/comp_cv_steps.pdf}
+    \caption[Validation performance \acrshort{cv}]{Validation performance (\acrshort{bacc}) of training on a data set using \acrshort{cv} plotted against number of epochs.}
+    \label{fig:cv_steps}
+\end{figure}
+\Acrshort{cv} was performed and tested for each fold after each epoch on the validation set. The resulting \acrshort{bacc} values were plotted against the epochs. A fold is plotted in a separate color and the epoch number starts at one in each case. It can be seen that the \acrshort{bacc} usually fluctuates heavily at the beginning, but then quickly levels off and steadily drifts up or down. It can be seen that all folds have a maximum above 0.5 \acrshort{bacc}. However, the \acrshort{bacc} then commonly drops again at different rates or settles in a certain range.
+% Done.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{./figures/pretesting/comp_with_out_da.pdf}
+    \caption[Validation performance with(-out) \acrshort{da}]{Validation performance of training on a data set with and without \acrshort{da} (blue and green) plotted against number of batches.}
+    \label{fig:comp_with_out_da}
+\end{figure}
+\Acrshort{resnet} is trained on the same data set with same hyperparameters two times (see \cref{fig:comp_with_out_da}). The two curves describe the \acrshort{bacc} validation performance for one test conducted with and one test conducted without \acrshort{da}. Fully random horizontal shifting is applied in the second test (blue). A single holdout is used for validation after training each batch. We observe that the validation performance increases faster when training without \acrshort{da}. On the other hand when applying \acrshort{da} the validation performance increases slower but is able to reach a higher maximum. Tests confirmed that a lack of \acrshort{da} result in early overfitting and poor generalizability (green curve). By using data augmentation, this effect could also be reduced when training with \acrshort{ivoct} data. However some show the opposite effect. Thus is cannot be generalized for all DA techniques.
+
+% Done.
+
+\section{Augmentation Experiments}
+
+As reference values, we use the performance values of the models trained with augmented data among each other and thus compare their effectiveness in a more meaningful way. In the following, each tested data set was augmented by a different transformation and their performance compared using \acrshort{cv} and standard metrics as described above. We apply several transformations to our \glspl{b-scan} before transforming them into cartesian format. By this it is ensure that we do not alter the form of zeroed edges in cartesian format, which would significantly differ from realistic images and is assumed not to have any performance improving impact on the model.
+
+The confusion matrix is used to compute \acrshort{sens} as well as \acrshort{spec} to compare how well true positives and true negatives can be identified. Precision (\acrshort{ppv}) measures the proportions of positive and negative results overall. Furthermore we use \acrshort{bacc} instead of \acrshort{acc} which considers both \acrshort{sens} and \acrshort{acc} and joins them in one measure independent of weight, because our data set is slightly unbalanced. Additionally we utilize the F1-score measure returning high values if the number of true positives obtained is high compared to the other confusion matrix cells. \Acrshort{mcc} represents a recently introduced measurement, which covers F1-score and \acrshort{bacc} as well. For this reason we consider it in the following as well. Since it deteriorates with unbalanced data sets, it has to be considered carefully between different data sets. \cite{Chicco.2020}
+
+\subsection{Affine Transformations}
+
+\subsubsection{Horizontal Shifting}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & Pixels & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{4}{2em}{Pol} & 0 & 0.7891 & 0.4567 & 0.7422 & 0.6229 & 0.7649 & 0.2549 \\
+         & 5 & 0.7846 & 0.4567 & 0.7411 & 0.6207 & 0.7623 & 0.2495 \\
+         & 20 & 0.7786 & 0.4507 & 0.7375 & 0.6147 & 0.7575 & 0.2367 \\
+         & 173 & \textbf{0.8087} & \textbf{0.4925} & \textbf{0.7595} & \textbf{0.6506} & \textbf{0.7834} & \textbf{0.3127} \\
+        \hline
+        \multirow{4}{2em}{Car} & 0 & 0.9397 & 0.2537 & 0.7140 & 0.5967 & 0.8114 & 0.2760 \\
+         & 5 & 0.9398 & 0.2537 & 0.7140 & 0.5967 & 0.8114 & 0.2761 \\
+         & 20 & 0.9503 & 0.2478 & 0.7146 & 0.5990 & 0.8158 & 0.2919 \\
+         & 173  & \textbf{0.9428} & \textbf{0.2955} & \textbf{0.7262} & \textbf{0.6191} & \textbf{0.8204} & \textbf{0.3270} \\
+        \hline
+    \end{tabular}
+    \caption[Horizontal shifting and rotation]{Performance measures of \acrshort{resnet} trained on data sets that have been augmented by random horizontal shift value from distinct pixel ranges. Training with both, polar (Pol) and cartesian (Car) representation has been tested. Bold numbers indicate the best performance value in the respective column.}
+    \label{tab:da_results1}
+\end{table}
+As horizontal shifting corresponds to centre rotation in the cartesian representation. We perform shifting operations on polar representations to avoid information loss due to repeated interpolation. We determine the shifting amount and direction (horizontally or vertically) by choosing a random value from chosen range. For instance, when a range of 20 pixels is defined, the images are shifted on the horizontal axis in positive or negative direction by a random value in the interval -20 and 20. As Davella \cite{Devalla.2018} proposes to give increased weight to smaller shifts, we test if shifting the images by a smaller amount gives the same results in unproportional improvements compared to the pixel range size. This is done by testing for different ranges 5, 20 and 173, where the last one is the maximum possible amount.
+
+Slight rotations (5-20 pixels) result in only minor to no changes in balanced prediction accuracy. When training with cartesian representations, \acrshort{mcc} increases by 5.1\%, while \acrshort{bacc} improves by 2.2\%. Training on polar representation behaves similar and results in a fundamentally larger \acrshort{spec}, but smaller \acrshort{sens}. We observe that the model can learn best from fully random cartesian rotations with maximum displacement of 173 pixels in positive as well as negative direction.
+
+\subsubsection{Vertical Shifting}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & Pixels & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{4}{2em}{Pol} & 0 & 0.7891 & 0.4567 & 0.7422 & 0.6229 & 0.7649 & 0.2549 \\
+         & 5 & 0.7725 & 0.4597 & 0.7391 & 0.6161 & 0.7555 & 0.2381 \\
+         & 20 & 0.7740 & 0.4567 & 0.7385 & 0.6154 & 0.7558 & 0.2370 \\
+         & 341 & \textbf{0.8448} & \textbf{0.4208} & \textbf{0.7430} & \textbf{0.6328} & \textbf{0.7906} & \textbf{0.2920} \\
+        \hline
+        \multirow{4}{2em}{Car} & 0 & 0.8192 & 0.4059 & 0.7321 & 0.6126 & 0.7732 & 0.2435 \\
+         & 5 & 0.8539 & 0.3791 & 0.7316 & 0.6165 & 0.7880 & 0.2637 \\
+         & 20 & 0.8614 & 0.3850 & 0.7352 & 0.6232 & 0.7933 & 0.2804 \\
+         & 341 & \textbf{0.8765} & \textbf{0.3820} & \textbf{0.7376} & \textbf{0.6292} & \textbf{0.8011} & \textbf{0.2996} \\
+        \hline
+    \end{tabular}
+    \caption[Vertical shifting and fold]{Performance measures of \acrshort{resnet} trained on data sets that have been augmented by random vertical shift value from distinct pixel ranges. Training with both, polar (Pol) and cartesian (Car) representation has been tested. Bold numbers indicate the best performance value in the respective column.}
+    \label{tab:da_results2}
+\end{table}
+Additionally shifting can be applied vertically. The augmentation technique is applied on the image in polar representation. Again, the model is trained on both representations, one with and one without transformation to a cartesian representation. Shifting intensities are scaled similarly to the horizontal shifting by 5,20 and 341 pixels. However, it must be taken into account that the resolution before the cartesian transformation differs in height and width. Therefore, a different maximum must be selected as the full shifting rate.
+
+Slight vertical shifts of up to 20 pixels in any direction result in only minor negative to no changes in balanced prediction accuracy. The \acrshort{mcc} shows similar behaviour while achieving a maximum of around 3.5\% improvement. When training with cartesian representations, larger improvements can be achieved. \acrshort{mcc} increases by 5.6\%, while \acrshort{bacc} improves by 1.6\%. We observe that the model can learn best from fully random vertical shifts with maximum displacement.
+
+Overall, it should be noted that horizontal and vertical shifts have similarly strong positive effects on performance (see \cref{tab:da_results2}). However, this only applies to full shifts. Smaller shifts might even have a negative effect when applied for certain test sets. A negative offset of the measurement series performance in \acrshort{spec} and \acrshort{mcc} with vertical shifts is caused by differences in the cartesian transformation and resulting differently positioned images. No measurable measurable improvement can be observed, when training on \acrshort{ivoct} data with a combination of horizontal and vertical shifts.
+
+% Done.
+
+\subsubsection{Random Flipping}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & Axis & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{3}{2em}{Pol} & Shift only & 0.6878 & 0.5940 & 0.7759 & 0.6409 & 0.7211 & 0.2813\\
+         & Horizontally & \textbf{0.7042} & \textbf{0.6026} & \textbf{0.7847} & \textbf{0.6534} & \textbf{0.7342} & \textbf{0.3071} \\
+         & Vertically & 0.6913 & 0.5997 & 0.7812 & 0.6423 & 0.7235 & 0.2924 \\
+        \hline
+        \multirow{3}{2em}{Car} & Shift only & 0.7212 & 0.6072 & 0.7901 & 0.6642 & 0.7473 & 0.3281 \\
+         & Horizontally & \textbf{0.7250} & \textbf{0.6047} & \textbf{0.7899} & \textbf{0.6649} & \textbf{0.7496} & \textbf{0.3294} \\
+         & Vertically & 0.6201 & 0.6495 & 0.7922 & 0.6348 & 0.6701 & 0.2805 \\
+        \hline
+    \end{tabular}
+    \caption[Random flipping]{Performance indicators of \acrshort{resnet} trained on data sets that have been augmented by fully random horizontal shifts combined with vertical and horizontal random flipping. Training with both, polar (Pol) and cartesian (Car) representation has been tested. Bold numbers indicate the best performance value in the respective column.}
+    \label{tab:da_flipping}
+\end{table}
+For our next experiments, a data set augmented by fully random horizontal shifting was modified by additional horizontal and vertical flipping. We again test the training with and without subsequent transformation into cartesian format. In \cref{tab:da_flipping}, flipping is omitted in the first experiment. This allows us to make meaningful comparisons and evaluations of the effects of flipping.
+
+Models trained with horizontally flipped images perform best in comparison. They improve the performance in both cases, 2.5\% trained on polar representation and 0.2\% on cartesian representation. With vertical shifting, however, a positive effect can only be observed when training in polar representation. When vertically flipped images are transformed into cartesian format, the sensitivity and the \acrshort{mcc} score deteriorate drastically.
+
+\subsubsection{Stretching, Shearing, Scaling}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & DA technique & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{8}{2em}{Pol} & no DA & 0.6870 & \textbf{0.5838} & \textbf{0.7737} & 0.6354 & 0.7171 & 0.2697 \\
+         & Stretch Dw 25 & 0.6949 & 0.5757 & 0.7715 & 0.6353 & 0.7212 & 0.2698 \\
+         & Stretch Dw 70 & 0.7016 & 0.5717 & 0.7720 & 0.6367 & 0.7248 & 0.2739 \\
+         & Stretch Dw 200 & \textbf{0.7145} & 0.5642 & 0.7729 & \textbf{0.6393} & \textbf{0.7315} & \textbf{0.2818} \\
+         & Shear Hor 10 & \textbf{0.6850} & 0.5829 & 0.7725 & 0.6340 & 0.7157 & 0.2668 \\
+         & Shear Hor 30 & 0.6842	& 0.5881 & 0.7745 & 0.6361 & 0.7165 & 0.2707 \\
+         & Shear Hor 100 & 0.6831 & \textbf{0.5945} & \textbf{0.7769} & \textbf{0.6388} & \textbf{0.7176} & \textbf{0.2757} \\
+         & Scale & 0.6856 & 0.5875 & 0.7748 & 0.6366 & 0.7173 & 0.2718 \\
+        \hline
+        \multirow{8}{2em}{Car} & no DA & 0.7068 & 0.5480 & 0.7589 & 0.6274 & 0.7266 & 0.2544 \\
+         & Stretch Dw 25 & 0.7073 & 0.5504 & 0.7601 & 0.6288 & 0.7272 & 0.2576 \\
+         & Stretch Dw 70 & 0.7086 & 0.5561 & 0.7629 & 0.6324 & 0.7286 & 0.2653 \\
+         & Stretch Dw 200 & \textbf{0.7111} & \textbf{0.5672} & \textbf{0.7684} & \textbf{0.6391} & \textbf{0.7313} & \textbf{0.2800} \\
+         & Shear Hor 10 & \textbf{0.7050} & \textbf{0.5481} & \textbf{0.7586} & \textbf{0.6265} & \textbf{0.7249} & \textbf{0.2531} \\
+         & Shear Hor 30 & 0.7016 & 0.5482 & 0.7580 & 0.6249 & 0.7214 & 0.2507 \\
+         & Shear Hor 100 & 0.6895 & 0.5488 & 0.7560 & 0.6192 & 0.7094 & 0.2421 \\
+         & Scale & 0.7080 & 0.5537 & 0.7617 & 0.6309 & 0.7280 & 0.2621 \\
+        \hline
+    \end{tabular}
+    \caption[Stretching, shearing, scaling]{Performance indicators of tested models trained on data sets augmented by downward (Dw) stretching, horizontal (hor) shearing and scaling. Transformations were applied to polar representation. The numbers 25, 30, 70, 100 and 200 represent the maximum number of rows or columns (\( n \)) that were cut off in total. Training on polar (Pol) and cartesian (Car) representation is considered. }
+    \label{tab:str_sh_sc}
+\end{table}
+With stretching and shearing we test further \acrshort{ivoct} specific affine transformations. Different interval sizes should help to better estimate how strong the stretching must be such that the model can learn from it. The test results show that augmentation by stretching and shearing can have a positive effect on the performance of the model when training polar images. Thus, stretching increases the \acrshort{mcc} by 1.2\%, while shearing increases the \acrshort{mcc} by 0.9\% when trained with images in polar transformation (see \cref{tab:str_sh_sc}). Stretching also increases the performance when training with data in cartesian representation. Shearing on the other hand shows a negative effect. \acrshort{bacc} and F1-score reflect the described tendencies similar to \acrshort{mcc}. However, if \acrshort{sens}, \acrshort{spec} and \acrshort{ppv} are considered separately, the described tendencies do not apply. 
+
+% Done.
+
+\subsection{Elastic Deformation}
+
+Similar to affine transformations, elastic transformations attempt to increase the learning effect for the model by moving and reshaping features. A mesh grid was created from two Gaussian filters, from which the shifted coordinates for the new pixel positioning emerge. By subsequent interpolation we generate images congruent to Simards proposal \cite{Simard.2003}. The deformation is conducted before the cartesian transformation is applied. We tested this transformation with an alpha values around 500 and a sigma value around 25. Several experiments were performed using different alpha and sigma values. Both values were varied by increments of ten percent from minus 60\% to plus 140\% (rounded). The elastic deformation transformation increased the performance of the \acrshort{mcc}, \acrshort{bacc} or F1-score in all of the cases. It had a small positive effect on the test result. A test with initial values scaled by 30\% for alpha and sigma results in peak improvement of 2\% \acrshort{mcc} to an average of 0.2697. Training on data in cartesian representation does results in an improvement smaller than with polar transformation. Its peak performance is reduced by 0.93\%.
+
+% Done.
+
+\subsection{Intensity Shifting}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & DA technique & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{10}{2em}{Pol} & no DA & 0.6870 & 0.5838 & 0.7737 & 0.6354 & 0.7171 & 0.2697 \\
+         & Contrast 0.1 & 0.6856 & 0.5842 & 0.7733 & 0.6349 & 0.7161 & 0.2686 \\ %0.1
+         & Contrast 0.3 & \textbf{0.6829} & 0.5851 & 0.7724 & 0.6340 & 0.7143 & 0.2665 \\ %0.25
+         & Contrast 1.0 & 0.8825 & \textbf{0.2388} & \textbf{0.6968} & \textbf{0.5607} & \textbf{0.7787} & \textbf{0.1570} \\ % 0.5
+         & Brightness 0.1 & 0.6846 & 0.5824 & 0.7725 & 0.6335 & 0.7147 & 0.2662 \\ %0.1
+         & Brightness 0.3 & 0.6800 & 0.5796 & 0.7702 & 0.6298 & 0.7099 & 0.2592 \\ %0.25
+         & Brightness 1.0 & \textbf{0.6637} & \textbf{0.5697} & \textbf{0.7619} & \textbf{0.6167} & \textbf{0.6932} & \textbf{0.2347} \\ % 0.5
+         & CLAHE & 0.5914 & 0.6656 & 0.8001 & 0.6385 & 0.6452 & 0.2795 \\ % to all
+        \hline
+        \multirow{10}{2em}{Car} & no DA & 0.7068 & 0.5480 & 0.7589 & 0.6274 & 0.7266 & 0.2544 \\
+         & Contrast 0.1 & 0.7044 & 0.5494 & 0.7575 & 0.6279 & 0.7266 & 0.2543 \\ %0.1
+         & Contrast 0.3 & 0.7037 & 0.5483 & 0.7566 & 0.6270 & 0.7248 & 0.2522 \\ %0.25
+         & Contrast 1.0 & \textbf{0.7023} & \textbf{0.4040} & \textbf{0.6810} & \textbf{0.5537} & \textbf{0.7872} & \textbf{0.1427} \\ % 0.5
+         & Brightness 0.1 & 0.7044 & 0.5466 & 0.7577 & 0.6255 & 0.7242 & 0.2509 \\ %0.1
+         & Brightness 0.3 & 0.6998 & 0.5438 & 0.7554 & 0.6218 & 0.7194 & 0.2439 \\ %0.25
+         & Brightness 1.0 & \textbf{0.6845} & \textbf{0.5329} & \textbf{0.7481} & \textbf{0.6077} & \textbf{0.7037} & \textbf{0.2204} \\ % 0.5
+         & CLAHE & 0.6122 & 0.6288 & 0.7843 & 0.6305 & 0.6537 & 0.2652 \\ % to all
+        \hline
+    \end{tabular}
+    \caption[Intensity shiftings]{Performance indicators of tested models trained on data sets augmented by different intensity shifts. Transformations were applied to polar representation. Training on polar (Pol) and cartesian (Car) representation is considered. The Lowest values have been }
+    \label{tab:intshift}
+\end{table}
+We investigate a variety of variants to augment the data set by intensity shifting. In our experiments, contrast and brightness jitering is used in the attempt to make the model robust to any of those variations. We test whether and if so, which of the intensity shiftings help the model to learn better. The floating point numbers define a maximum value of the interval from which a jittering intensity is chosen. Furthermore it is investigates weather intensity shiftings introduced by Davella and \acrshort{clahe} result in an improved performance or not. \Acrshort{clahe} is an exception in this context, since transformed and realistic images are too distinct and \acrshort{clahe} images therefore unsuitable for an extension of the data set. Nevertheless, it may be that the model benefits from this pre-procesing transformation, since it highlights particularly low-contrast sections clearly.
+
+\Cref{tab:intshift} shows that neither contrast nor brightness jittering has a positive effect on the performance of the model. If the interval from which the jittering value is selected is small, this has only a very small effect on the \acrshort{mcc} values when training with polar as well as when training with Cartesian representation. Jittering from an interval of increased intensities from 0.3 to 1.0 lead to a drastic reduction of \acrshort{bacc} and \acrshort{mcc}. The most drastically reduced numbers are marked by bold numbers. Particularly strong contrast has the effect of reducing the \acrshort{bacc} by 9\% and the \acrshort{mcc} by 11\%. The \acrshort{clahe} filter clearly improves increased \acrshort{bacc} and \acrshort{mcc} values. All regularities are similarly observable in polar as well as Cartesian representation.
+
+% Done.
+
+\subsection{Noise Filters}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & DA Technique & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{7}{2em}{Pol} & no DA & 0.6870 & 0.5838 & 0.7737 & 0.6354 & 0.7171 & 0.2697 \\
+         & Gauss N 1000 & 0.5478 & 0.6964 & 0.7643 & 0.5871 & 0.5483 & 0.2382 \\
+         & Gauss N 2000 & 0.5360 & 0.7087 & 0.7710 & 0.5874 & 0.5361 & 0.2404 \\
+         & Gauss B S1 & 0.7177 & 0.5586 & 0.7618 & 0.6282 & 0.7308 & 0.2580 \\
+         & Gauss B S2 & 0.7916 & 0.4126 & 0.7025 & 0.5921 & 0.7994 & 0.2495 \\
+         & Davella & \textbf{0.6860} & \textbf{0.5787} & \textbf{0.7722} & \textbf{0.6332} & \textbf{0.7139} & \textbf{0.2655} \\
+         & Salt and Pepper & \textbf{0.6721} & \textbf{0.5795} & \textbf{0.7701} & \textbf{0.6381} & \textbf{0.7206} & \textbf{0.2652} \\
+        \hline
+        \multirow{7}{2em}{Car} & no DA & 0.7068 & 0.5480 & 0.7589 & 0.6274 & 0.7266 & 0.2544 \\
+         & Gauss N 1000 & 0.5496 & 0.6636 & 0.7520 & 0.5815 & 0.5598 & 0.2354 \\
+         & Gauss N 2000 & 0.5778 & 0.6759 & 0.7587 & 0.5818 & 0.5476 & 0.2376 \\
+         & Gauss B S1 & 0.7395 & 0.5058 & 0.7495 & 0.6226 & 0.7423 & 0.2452 \\
+         & Gauss B S2 & 0.8934 & 0.3598 & 0.6902 & 0.5865 & 0.8109 & 0.2367 \\
+         & Davella & \textbf{0.7058} & \textbf{0.5429} & \textbf{0.7574} & \textbf{0.6252} & \textbf{0.7234} & \textbf{0.2502} \\
+         & Salt and Pepper & \textbf{0.6939} & \textbf{0.5467} & \textbf{0.7578} & \textbf{0.6325} & \textbf{0.7321} & \textbf{0.2524} \\
+        \hline
+    \end{tabular}
+    \caption[Convolutional filters]{Performance indicators of tested models trained on data sets augmented by Gaussian blur (B), noise (N) as well as Salt and Pepper noise. Training on polar (Pol) and cartesian (Car) representation is considered. Transformations were applied to the according representation.}
+    \label{tab:conv_filters}
+\end{table}
+Multiple noise filters are applied to test if the \acrshort{resnet} benefits from this kind of augmentation. Gaussian blur (B) is applied with kernel size 13 and different standard deviations \( \sigma = 1 \) and \( \sigma = 2 \) such that it can be investigated if the benefit is either in smaller or larger blur intensities. For Gaussian noise (N) multiplicative factors 1000 and 2000 are chosen. Furthermore the effect of Davellas noise was tested as alternative to Gaussian noise as well as salt and pepper noise. Gaussian blur and Davellas \cite{Devalla.2018} filter were applied before the cartesian transformation. Salt and pepper noise was applied to the corresponding representation on which the model was trained on to avoid removal by interpolation. 
+
+Our test results were not improved by training with Gaussian Noise, Blur filter. Instead, they made the model learn slightly slower. However, this changed little in the model performance. Davellas noise as well as salt and pepper noise show no or only negligible added value during training (bold numbers).
+
+% Done.
+
+\subsection{Partial Masking}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & DA Technique & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{4}{2em}{Pol} & no DA & 0.6870 & 0.5838 & 0.7737 & 0.6354 & 0.7171 & 0.2697 \\
+         & Random S0.2 & 0.6930 & 0.5723 & 0.7703 & 0.6326 & 0.7184 & 0.2654 \\
+         & Random S0.4 & 0.6969 & 0.5510 & 0.7626 & \textbf{0.6239} & 0.7163 & \textbf{0.2498} \\
+         & Remove Guidewire & 0.4312 & 0.7433 & 0.7824 & 0.5872 & 0.5332 & 0.1791 \\
+        \hline
+        \multirow{4}{2em}{Car} & no DA & 0.7068 & 0.5480 & 0.7589 & 0.6274 & 0.7266 & 0.2544 \\
+         & Random S0.2 & 0.7148 & 0.5395 & 0.7580 & 0.6256 & 0.7294 & 0.2533 \\
+         & Random S0.4 & 0.7187 & 0.5181 & 0.7503 & \textbf{0.6169} & 0.7273 & \textbf{0.2377} \\
+         & Remove Guidewire & 0.5065 & 0.6563 & 0.7469 & 0.5814 & 0.5796 & 0.1636 \\
+        \hline
+    \end{tabular}
+    \caption[Partial masking]{Performance indicators of tested models trained on data sets augmented by partial masking. Training on polar (Pol) and cartesian (Car) representation is considered. Transformations were applied to the according representation.}
+    \label{tab:partial_masking}
+\end{table}
+
+As with the other experiments, we train a model with data modified to a 50 percent probability by partial masking. In partial masking, different masking sizes are tested to avoid removing too much relevant information from the training data. The size of the coverage window is randomly chosen similar to Davella \cite{Devalla.2018}. Each side has a length corresponding to a maximum of \( n \) and a minimum of \( n/2 \) pixels, where \( n \) is a percentage of the respective edge length in pixels. First, \( n \) is chosen as 0.2\% (S0.2) and then as 0.4\% (S0.4). In addition, we test whether removing the guidewire that was applied by Davella \cite{Devalla.2018} as well has any advantages. In our experiments, the null masking covers 30 contiguous columns, assuming that the last column is contiguous with the first. The algorithm that determines which location is covered was implemented in the same way as described in the section about tunica variation.
+
+When validation performance is observed, it can be seen that the model learns significantly slower when training with partial masked data than when no partial masking is applied. This is also reflected in the results, especially \acrshort{bacc} and \acrshort{mcc}, in \cref{tab:partial_masking}. Neither in polar nor in cartesian representation training with partial masking augmented data leads to an improvement in performance. Small masking windows change little or nothing in the results. Larger maskings reduce the learning speed, but also do not improve the test results. Thus, when the same epoch is used to run tests, significantly lower \acrshort{mcc} values are achieved (bold numbers). Random guidewire removal has an even worse effect on test results in our experiments, reducing \acrshort{bacc} and \acrshort{mcc} by more than 5\%. Guidewire removal has similar effects as partial masking and does not lead to any detectable performance boost.
+
+% Done.
+
+\subsection{Artefact Imitation}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|l|c|c|c|c|c|c|c|}
+        \hline
+        Repr. & DA Technique & \acrshort{sens} & \acrshort{spec} & \acrshort{ppv} & \acrshort{bacc} & F1-score & \acrshort{mcc} \\\hline\hline
+        \multirow{5}{2em}{Pol} & no DA & \textbf{0.6870} & \textbf{0.5838} & \textbf{0.7737} & \textbf{0.6354} & \textbf{0.7171} & \textbf{0.2697} \\
+         & Tunica Variation & 0.6644 & 0.5928 & 0.7717 & 0.6286 & 0.7067 & 0.2413 \\
+         & Column Scaling & 0.5409 & 0.7480 & 0.7986 & 0.6444 & 0.6650 & 0.2234 \\
+         & Random Guidewire & 0.6373 & 0.6281 & 0.7778 & 0.6334 & 0.7003 & 0.2307 \\
+         & Blood Speckle & 0.6900 & 0.5719 & 0.7707 & 0.6309 & 0.7165 & 0.2634 \\
+        \hline
+        \multirow{5}{2em}{Car} & no DA & \textbf{0.7068} & \textbf{0.5480} & \textbf{0.7589} & \textbf{0.6274} & \textbf{0.7266} & \textbf{0.2544} \\
+         & Tunica Variation & 0.6872 & 0.5594 & 0.7589 & 0.6240 & 0.7202 & 0.2289 \\
+         & Column Scaling & 0.5637 & 0.7147 & 0.7858 & 0.6399 & 0.6785 & 0.2111 \\
+         & Random Guidewire & 0.6570 & 0.5923 & 0.7630 & 0.6254 & 0.7098 & 0.2154 \\
+         & Blood Speckle & 0.6885 & 0.5778 & 0.7722 & 0.6331 & 0.7168 & 0.2666 \\
+        \hline
+    \end{tabular}
+    \caption[Artefact imitation]{Performance indicators of tested models trained on data sets augmented by different intensity shifts. Transformations were applied to polar representation. Training on polar (Pol) and cartesian (Car) representation is considered.}
+    \label{tab:da_results3}
+\end{table}
+The last DA techniques tested are curve variation, columns scaling as well as random guidewire creation and random blood speckle imitation. For all transformations, different variations were tried and representative test results were listed in \cref{tab:da_results3}. Curve variation was varied in the intensity of the maximum possible curve shift. A maximum of one additional guidewire was inserted per image to avoid covering larger sections of image content.
+
+Data augmentation with artificial artifacts does not boost bacc and mcc in any of the cases. Artifacts that affect larger areas of pixels and change their contrast ratios deteriorate the test results in particular more than 4\%.
+
+% Done
+
+\section{General Remarks}
+
+In most cases, the effects of the various \acrshort{da} techniques do not differ noticeably when the images were transformed into cartesian format. Exceptions are all transformations that process the margins of the image unevenly, causing prominent artifacts after its cartesian transformation. In this case, the corresponding transformation should be omitted, or training on the polar representation should be preferred. An example of this is horizontal shearing of the B-scan on the temporal axis. Scaling shows a similar effect.
+
+In general, in our experiments models trained with polar images tend to perform better. In addition, it was observed that \acrshort{da} techniques strongly help to determine classes that are unevenly weighted and difficult to predict. Furthermore, it was observed that \acrshort{da} techniques strongly help to determine unweighted and harder-to-predict classes. Sens and spec are well suited indicators for this phenomenon. It was observed that \acrshort{da} techniques strongly help to determine unweighted and harder-to-predict classes. For this phenomenon, \acrshort{sens} and \acrshort{spec} are good indicators. The harder to predict class benefits significantly from data augmentation, while the complementary value suffers slightly. Nevertheless, the total \acrshort{mcc} and \acrshort{bacc} are significantly increased.

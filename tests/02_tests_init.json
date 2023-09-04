@@ -1,0 +1,9 @@
+
+{
+    "pretrained": false,
+    "calc_train_error": false,
+    "batch_size": 128, 
+    "enable_wandb": true,
+    "num_cv": 7,
+    "group": "group-init"
+}

@@ -1,0 +1,247 @@
+\chapter{Methodology}
+
+\section{Overview}
+
+In order to perform our \acrshort{da} experiments on \acrshort{ivoct} data, certain preparations must be made beforehand. We present a pipeline interpretation with a \acrshort{cnn}, which allows us to better generalize observations from our experiments that are performed subsequently. In order for the \acrshort{ivoct} images to be processed well by the pipeline, we provide a detailed description on how data are pre-processed. Furthermore, new \acrshort{da} techniques and the conducted experiments are presented. The experiments focus on the behaviour of \acrshort{da} techniques applied in the domain of \acrshort{ivoct} data.
+
+\section{Implementation}
+
+Training of \acrshort{nn}s is the most resource insensitive tasks in \acrshort{dl}. Often the time it takes to train an model is very crucial. New weights have to be recalculated and updated hundreds or thousands of times. Sometimes millions or billions of weights have to be adjusted in each training step. This may take a huge amount of time if calculations are not optimized well enough. Training of a \acrshort{nn}s essentially boils down to a huge number of matrix multiplications that can be parallelized to a high extend. Thus \acrshort{nn}s can be accelerated by optimizing either software or the hardware components. Most importantly, both have to be coordinated accordingly.
+
+GPUs as one of the class of Multiple Instructions, Multiple Data (MIMD) computing architectures excel at parallel programming. Thus programs that can be parallelized may be speed up significantly. For our experiments, we use special hardware to run the tests in feasible time as well. Our hardware setup consists of a 64 Bit Quad Core Intel Xeon E3-1225 v3 Processor at its core, that enables real parallel execution of multiple processes. We used 16 GB of Random Access Memory (RAM) and attached an 840 EVO 250GB SSD Drive for local storage. For training acceleration we use an NVIDIA GeForce GTX 1080 Ti graphics card with 8 GB of GDDR5X memory. In \acrshort{dl} most highly optimized software is developed for the operating system we installed refered to as Ubuntu 20.04.4 LTS, a free and open source Linux distribution based on \gls{debian}.
+
+\subsection{PyTorch}
+
+In the field of \acrshort{dl} there are specialized frameworks, that can exploit the full potential of multiple attached GPUs. Among others, TensorFlow and Scikit-learn, PyTorch are some of the most widely used \acrshort{dl} frameworks for python \cite{Paszke.2019, Pedregosa.2011, Douglass.2020}. PyTorch has been developed by Facebook’s AI Research laboratory and was released in 2016 as a free and open-source python library. Its mainly used for computer vision, natural language processing and \acrshort{dl}. While these frameworks differentiate in efficiency and usability, PyTorch excels at combining simple and imperative programming with its highly efficient implementation using hardware accelerators. This enables a more feasible usage with an easy scalability. PyTorch performs parallel, immediate execution of dynamic tensor computations with GPU acceleration. With a C++ core it offers complex functionalities, e.g. automatic differentiation for backpropagation, while maintaining performance with help of multiprocessing. Its performance is comparable to the fastest current \acrshort{dl} libraries \cite{Paszke.2019}.
+
+PyTorch helps us to easily implement our training pipeline to conduct detailed tests on \acrshort{da}. It can be subdivided into three important parts. First, we preprocess the given data, then we train on them and finally we evaluate the models performance using the metrics introduced above. Preprocessing transformations are fundamental dependent on the model used. Thus we present the model for our experiments first.
+
+\subsection{ResNet-18}
+
+\begin{figure}[hbt]
+    \includestandalone[width=1\textwidth]{../figures/resnet_18}
+    \caption[\acrshort{resnet}-18]{\acrshort{resnet}-18 pipeline architecture with 5 convolutional layers (yellow) stacked directly on each other with a max pooling convolutional layer (orange) on the left and an average pooling layer (blue) on the right. It results into a fully connected layer (purple light) and a softmax function layer (purple dark) with output size of n variables. \cite{Iqbal.2020}}
+    \label{fig:resnet18}
+\end{figure}
+
+Using a widely and academically meaningful architecture that is comparatively well known and understood offers several advantages. First it gives us the opportunity to use \acrshort{dl} frameworks that offer a variety of advantages and it allows us to fall back on existing functionalities and data like pretrained models. Lastly, well known models allow for a deeper level of interpretation than others. For image classification, convolutional neural networks are the current state-of-the-art architecture \cite{Albawi.2017}. Due to the fact that there exists a significant amount of research regarding \acrshort{cnn}s, known models are comparatively well understood. Known \acrshort{cnn}s like \acrshort{resnet}s, VGGNets and AlexNets have been academically examined in further detail \cite{He.3162016, WeiYu.2016, Majib.2021}, which enables us to interpret these models with a higher degree of certainty and exactness on another level. It has been shown that \acrshort{cnn}s excel in medical image classification. More precisely, \acrshort{resnet}s show a convincing performance compared to other \acrshort{cnn}s. \cite{Tajbakhsh.2016, He.12102015} Next to factors like the data size and the training repetition, the model complexity plays a fundamental role when investigating the training time. Thus one often aims for a rather compact \acrshort{cnn}. We note that \acrshort{resnet} with 34 convolutional layers has a performance error of less than 3\% better than a \acrshort{resnet} with only 18 layers. Nevertheless, many principles and observations between them are comparable. \cite{He.12102015} When training for similarly complex functions the performance improvement by using deeper networks is comparable. The goal of this work is not to reach the highest performance values, but to utilize a model with representable outputs for later experiments. For this reason we implement a \acrshort{resnet} with 18 convolutional layers called \acrshort{resnet}-18 (see \cref{fig:resnet18}). This way we are able to transfer our won knowledge well to other models and simultaneously perform experiments in a descent time. \acrshort{resnet}-18 expects an input image with the shape HxWx3 (see \cref{tab:ResNet18}. W and H are expected to be at least of size 224. Its first convolutional layer (conv1) has a kernel of dimensions 7x7 with a stride of 2. Because it has 64 feature maps it stretches the dimensional ratio to 112x112x64 (neglecting multiple channels for simplicity). Secondly a max pooling operation with a 3x3 kernel (2x2 padding) and a stride of two is used. Batch normalization is also applied. Because of the additional stride in the max pooling operation, the second layer has no additional downsampling and outputs a batch with the dimensions 65x65x128. The following layers consists of two blocks each. Both are characterized by a 3x3 kernel with 2x2 padding on each side. The first block has an increased stride of two, which is why we use a projection shortcuts with a convolutional operation at first and an identity shortcuts everywhere otherwise. After the fifth layer, there is an average pooling operation with a 7x7 kernel and an output size of 1x1x512. We merge all leftover nodes with a 500x1000 fully connected layer followed by a softmax function that outputs the desired number of variables for classification in a one-hot format.
+
+\subsection{Pipeline}
+
+For our experiments in this work, we use \acrshort{resnet}-18 as described above. \acrshort{resnet}-18 has different training and evaluation behavior, such as backpropagation. To switch between these modes, we use the methods model.train() or model.eval(). The model is embedded into a pipeline with several additional features that can be adapted to optimize the pre-processing, training and testing processes. Our pipeline allows for optional pruning that may result in a better performance. Other options are the choice of optimizer and loss function. We weight the loss for “plaque” higher in order to counter class imbalance. Optionally, deterministic computations make the model computations reproducable. The most important feature of our pipeline is the ability to choose which \acrshort{da} techniques are applied in which order. Note that randomization with \acrshort{da} and the use of different hardware components may break determinism. L2 regularization can be used by setting the weight-decay parameter to a non zero value when calling the optimizer. We are also able to vary certain other parameters. Among them are the \gls{learning-rate}, early stopping patience as well as early stopping \acrshort{acc}. Our model performs average pooling in case the images are not of the size 224x224.
+
+Note that our model repeats training with the same data several times, while step-wise adapting the \gls{learning-rate} (ideally scaling with a downward trend). Each repetition is referred to as an epoch. Weight updates are calculated from backpropagation errors and performed batchwise by computing their average for better generalization. Each batch contains \( n \) images, where \( n \) is commonly a power of two in [32, 64, 128, 256]. For efficiency reasons the data loader preloads the images to the main memory. It is important to note that smaller batch sizes are good against overfitting, but train slower. Larger batch sizes do not always converge as fast, but result in faster training progress. After each epoch, the model is tested on a validation set. The new model is stored in a checkpoint, also including other configurations like scaler and optimizer. The performance is then compared to the model from the same or an earlier epoch that performed best. If the performance improvement lies under a certain threshold early stopping may be performed. If no early stopping is performed a specified value defines the maximum total number of epochs. To generate representative and generalizable results in our experiments, we conduct cross-validation with \( k \) subsets and an extra hold-out for testing.
+
+The pipeline tests the trained model automatically after the training process is completed. Performance measurements are logged in a dedicated text file while additionally uploading all metric values to an online service called Weights and Biases (\Gls{wandb}). This enables us to visualize the experimental results in a way that is more easily interpretable. The use of WandB is optional but is of importance, e.g. to detect oerfitting with B-logging early. Here refer to B-logging as the ability to compare the performance of a model when tested on validation as well as the testing set while training.
+
+\section{Data Preprocessing}
+
+In this work we strictly differentiate between pre-processing transformations and those, that actually augment the final data set on which models are trained on. In contrast to DA techniques, Pre-processing transformations are uniformly applied to all images by a possibility of 100\%. They substitute the old, unprocessed data and therefore do not augment the data set. The implemented pipeline applies DA techniques by a certain probability, that may be between 0\% and 100\%. Thus whenever the data loader accesses an image, it may get back different results. Pre-processing highly depends on the data that we apply our model on. Thus we present the underlying data set first.
+
+\subsection{IVOCT Data Set}
+
+The data set we used for our experiments has a total of 3951 individual \acrshort{ivoct} images. Each of these images has a resolution of 347 by 683 pixels and consists of 16 bit unsigned intensity values with a maximum value of 65535. This means that each of the 347 A-scans per frame has a depth of 683 pixels assembled to a B-scan in h5 format. Each image was assigned a label, which indicates whether deposits are present in the vessel, or whether they can be detected based on the single cross-sectoinal image slice. None of the images contains a stent as this would distort results, because the underlying model may learn from the presence of the stent instead of learning the desired property, namely the presence of plaque. In general, six different types of plaque can be distinguished, e.g. if its calcified or not. In this work, we restrict ourselves to a binary classification that distinguishes whether the image represents disease-affected or healthy anatomy. The classification was made by three experienced physicians for each frame. In the classification, a one indicates that plaque was detected, while a zero, on the other hand, indicates its absence. To ensure the images have been labeled correctly, the experts were provided partially the same data for manual \glspl{b-scan} classification. Distinguishing values were classified repeatedly to ensure label quality by labeling with the consensus. A comparatively large data set containing a variety of challenging cases could be acquired this way. For investigations on \acrshort{da} it suffices to merge original characterizations to binary labels “plaque” and “no plaque”. It is important to note that we have 2142 positive and 1808 negative labels. With class weights this is a ratio of 0.542\% (with plaque) to 0.458\% (without plaque), which shows that we have a slightly imbalanced data set. In the following steps we did not balance the data set for training or testing purposes to avoid information loss, which would inevitably lead to poorer prediction performance. Instead we adapt our training and testing implementations. While training, imbalanced data sets can be handled by first, a \gls{wrs} in the data loader, and secondly, by weighting parameters in the loss function. In the following test phase, we adapted the metrics used to measure the performance of our models (as described in the section about metrics). The given \acrshort{ivoct} data consist of multiple intravascular serial images obtained by a different pullbacks and patients. Frames coming from a single pullback cannot be considered independently from each other when they are processed.
+
+\subsection{Cartesian Transformation}
+
+In \acrshort{ivoct} the recorded \Glspl{b-scan} (sequence of \Glspl{a-scan}) are generated in a \acrshort{2d} polar coordinate format visualized as an image. Using Cartesian transformation the scans can additionally be converted into a human interpretable format. There exist two \acrshort{2d} equations representing the relation of the two coordinate systems. For the relational mapping from the cartesian towards polar coordinates see \cref{eq:cartequ}. This conversion can mathematically be represented by the transformation matrix given in \cref{eq:cartmatrix}.
+\begin{equation}
+\vec{\nu} \begin{pmatrix} r \\ \theta \end{pmatrix} = 
+r \begin{pmatrix} \cos \theta \\ \sin \theta \end{pmatrix} = 
+\begin{pmatrix} x \\ y \end{pmatrix}
+\label{eq:cartequ}
+\end{equation}
+
+\begin{equation}
+\begin{pmatrix}
+x \\
+y \end{pmatrix} = \begin{pmatrix}
+\cos \theta & -r \sin \theta \\
+\sin \theta & r \cos \theta \end{pmatrix} \begin{pmatrix}
+r \\ \theta \end{pmatrix}
+\label{eq:cartmatrix}
+\end{equation}
+
+Similarly the backward transformation from the polar into the cartesian coordinate system is shown in \cref{eq:polmatrix} as a result of the Jacobian matrix as a result of its associated mapping above \cref{eq:polequ}. By the trigometric inverse function the sign must be determined in a case distinction depending on which quadrant the point (x,y) is located.
+\begin{equation}
+\vec{\nu} \begin{pmatrix} x \\ y \end{pmatrix} =
+\begin{pmatrix} \sqrt{ x^2 + y^2 } \\ tan^{-1}\left( \frac{y}{x} \right) \end{pmatrix} = \begin{pmatrix} r \\ \theta \end{pmatrix}
+\label{eq:polequ}
+\end{equation}
+
+\begin{equation}
+\begin{pmatrix}
+r \\
+\theta \end{pmatrix} = \begin{pmatrix}
+\frac{x}{\sqrt{x^2 + y^2}} & \frac{y}{\sqrt{x^2 + y^2}} \\
+-\frac{y}{x^2 + y^2} & \frac{x}{x^2 + y^2} \end{pmatrix} \begin{pmatrix} x \\ y \end{pmatrix}
+\label{eq:polmatrix}
+\end{equation}
+
+The transformation causes a higher information density towards the centric origin of the image and a lower resolution vice versa. The described mapping has been interpolated with the \Gls{makimamethod} which leads to information loss towards the origin, preserving a lower information density vice versa. This inhomogeneous image quality coincides with common qualitative \acrshort{ivoct} imaging observations and is amplified due to limitations of physical principles of \acrshort{oct} scanning techniques (see \acrshort{ivoct} section). A full transformation cycle including forward and backward transformation can create artifacts and lead to information loss.
+\begin{figure}[htb]
+	\centering
+	\includegraphics[scale = 0.25]{./figures/ivoct_scan_polar.png}
+	\caption[\acrshort{ivoct} polar \Gls{b-scan}]{An exemplary \acrshort{ivoct} \Gls{b-scan} (dimensions: 347x683 pixels) in original polar format. Brightness and contrast have histographically been adjusted and distributed more uniform to visualize the \Gls{b-scan} to the human eye.}
+	\label{fig:scanpol}
+\end{figure}
+Therefore it is recommended to only transform the polar into cartesian coordinates ones if required and avoid backwards transformation. The resulting cartesian image is scaled during \gls{interpolation} to a size such that twice the radius corresponds exactly to the smallest side of the polar image. One differentiates between four different types of \gls{interpolation}, namely: nearest neighbor, bilinear and bicubic. Bicubic \gls{interpolation} considers the closest 4x4 neighbourhood and builds a weighted average, which forms a good compromise between computational costs and sharpness. After the transformation, the images have an aspect ratio like a equilateral quadrilateral. Thus the entire conversion leaves undefined edges, that must explicitly be defined in preprocessing (see \cref{fig:scancart}). A key advantage of this transformation is that the information have a rather realistic relation to each other, leading to a more intuitive appearance. When examining \acrshort{ivoct} image structures, one can distinguish regions of the lumen (signal poor region), media, and plaque in the media (close to the luminal border). Ambiguous information near the detector are weighted less than distant information. This makes the weighting of the information at the origin of the source image more consistent with the actual volume distribution of the anatomy.
+\begin{figure}[htb]
+	\centering
+	\includegraphics[width = 0.5\textwidth]{./figures/ivoct_scan_cartesian.png}
+	\caption[\acrshort{ivoct} cartesian \Gls{b-scan}]{An exemplary \acrshort{ivoct} \Gls{b-scan} (dimensions here: 300x300 pixels) transformed from polar into cartesian coordinate system. The conversion generates undefined edges, here shown in black. Brightness and contrast have histographically been adjusted and distributed more uniform to visualize the \Gls{b-scan} to the human eye.}
+	\label{fig:scancart}
+\end{figure}
+
+\subsection{Model Preparation}
+
+The \acrshort{ivoct} image is a map of intensities and therefore only provides 1D grayscales. Even though \acrshort{resnet}-18 takes an image with resolution 224x224x3 as input size for RGB-images with three channels, we can use it for a 1D image with only a single channel as well. There are two ways to do this. One way is to join the 1D image with two additional zero channels. As described in the section about \acrshort{resnet}s, these layers zero out and have no effect on the overall result. Alternatively one can replicate the grayscaled channel, so that all three channels are used for training. This does not add any new information. Depending on the implementation this process may be slower than the training process with the padded image, because additional complex computations have to be executed. When pretraining, replication may result in a better performance, because all information from \gls{imagenet} are processed.
+
+We pre-train our network for faster convergence and a higher prediction performance. PyTorch provides an easy way of using a \acrshort{resnet}-18 pre-trained on the \gls{imagenet} data set. It is unknown if \gls{imagenet} data and \acrshort{ivoct} data sets have any intersection of information. Trivially, other \acrshort{ivoct} data sets have more in common with the provided data set, since they stem from a similar domain. It is yet an open question, if pre-training on either of these data sets adds any value to the overall performance.
+
+\begin{equation}
+    \operatorname{RS} = \frac{D_i - \text{min}}{\operatorname{max} - \operatorname{min}}
+    \label{eq:rescaling}
+\end{equation}
+\begin{equation}
+    \operatorname{MN} = \frac{D_i - \mu}{\operatorname{max} - \operatorname{min}}
+    \label{eq:normalization}
+\end{equation}
+\begin{equation}
+    \operatorname{SD} = \frac{D_i - \operatorname{mean}}{\sigma}
+    \label{eq:standardization}
+\end{equation}
+When pre-training on similar domains, normalizing the data set with the mean and standard deviation of the pre-training data may as well give better results due to its fine-tuning effect on the model. Re-scaling (RS in \cref{eq:rescaling}), Mean Normalization (MN in \cref{eq:normalization}) and Standardization (SD in \cref{eq:standardization}) are good practises to scale input data by standardizing variables. These techniques often reduce training time and the numerical stability of the model \cite{Shanker.1996}. They can prevent increasing generalization error and unstable networks, so that the models prediction probabilities are not biased. As we can see in the above equations, \( \mu \) corresponds to the mean and \( \sigma \) to standard deviation of the entire data. \( D_i \) are the input data, whereas [RS, MN, SD] depict the transformed output data, e.g. image pixels. For this we load the images to a range of [0, 1]. For the \gls{imagenet} data set used in PyTorch \cite{PyTorchContributors.2019}, mean and standard deviation are officially provided in the documentation as mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225]. If not provided, they have to be computed from all images in the data set. Alternatively mean and standard deviation can be set to 0.5. Note that pre-trained models are cached by PyTorch automatically. This implementation allows caching this outside the docker container.
+
+\section{New Transformations in IVOCT}
+
+In the following transformations specifically for \acrshort{ivoct} imaging or data from very similar domains are introduced. Classical \acrshort{da} approaches can be less effective when there is a lack of labeled medical data and fail to generalize easily, because anatomical changes are much more diverse. \cite{BenCohen.2018} Hence we aim for new and IVOCT specific \acrshort{da} approaches. We describe their theoretical relation to \acrshort{ivoct} (artefacts, etc.), technical implementation and development.
+
+\subsection{Tunica Variation}
+
+The fundamental idea of this technique is based on the anatomy of the vessel. When considering the shape and diameter of a vessel, it is clear that these characteristics do not directly correlate with whether or not plaque is present in the vessel. \acrshort{cnn}s should also perform their classification as independently as possible. Since generalization is increasingly difficult with a smaller number of images, it may be advantageous to be able to randomly change the shape of the vessels. The easiest way to adjust the shape fit of the vessels is to shift the columns of a B-scan up and down in polar form. The difficulty is to choose the sections in such a way that in the end a new and realistic image is created again without distortions being visible or important sections being cut off. We achieve this by three basic steps, which are described in detail below.
+
+\begin{figure}
+    \centering
+    \includestandalone[width=.4\textwidth]{./figures/gaussian_curve}
+    \caption[Gaussian curve]{Gaussian curve with mean zero and standard deviation 15/21.}
+    \label{fig:gaussiancurve}
+\end{figure}
+The first step is to roughly determine the curve-like form, which can be observed in \cref{fig:da_sizevariation1}. It mainly originates from reflections of the tunica and is extracted by applying several filters. To be able to differentiate it from the bright artefacts caused by the catheter itself, we simply remove the first section of the image. It can be observed that these artefacts remain relatively static in position. By setting the first 75 lines of the image to zero, we simply remove this section. Although we now generate a black bar at the top, this is sufficient to meet the requirements for further processing later on. We apply a Gaussian filter with kernel size 21x21 and a kernel standard variation in X and Y direction of 15 (see \cref{fig:gaussiancurve}). The Gaussian filter computes the weighted average by in a convolution and thereby blurs the image so that unimportant details are neglected in the following steps. By applying a threshold to the 16 Bit image, we map the image to a binary representation (see \cref{fig:da_sizevariation1}) with the function
+\begin{equation}
+\operatorname{dst}(P_{src})=
+\begin{cases}
+0 & \text {if } P_{src} < \text {thresh} \\
+\text {maxval} & \text {otherwise}
+\end{cases}.
+\end{equation}
+All values smaller than 450 are represented in black (value zero) and values of at least 450 are represented in white (maximum value of 65535). Additionally we identify connected components and determine their statistics with a 4-way connectivity (all pixels that share an edge are considered as neighbours). This is in contrast to an 8-way connectivity, where pixels that share an edge are considered as neighbours as well. Smaller components containing less than 1700 pixels often represent disturbing bright artefacts that are thereby removed.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.24\textwidth]{./figures/DA1/im_261.h5orig_mod1-0_coloured.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA1/im_261.h5orig_mod1-1.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA1/im_261.h5orig_mod1-2.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA1/im_261.h5orig_mod1-3.png}
+    \caption[\acrshort{da} technique: polar vessel form variation]{A \acrshort{da} technique varying the form and diameter size of an \acrshort{ivoct} frame in polar format. The first image shows the extracted tunica curve from the original image (third). The original image is compared to the image with size variation showing a positive scaled Hann window (second) and an image with negative scaled Hann window (fourth). Note that all three images on the right are modified for illustration purposes, such that they have a more uniformly distributed histogram.}
+    \label{fig:da_sizevariation1}
+\end{figure}
+Before any columns can be shifted, it should be ensured that they can also be authentically extended in the appropriate direction, either upwards or downwards. To avoid unwanted deformation of the image, we exclude two types of columns from the shifting transformation. First we exclude the columns that contain artefacts by the catheters guide wire, because the reflection of the wire itself and its shadow limit how much the columns can be shifted, if the tunica is close to the catheter. Secondly, we exclude those columns where the curve height is above a threshold height of 573 (683 rows in total). This threshold is illustrated by the lowest straight and horizontal line on the most left image in \cref{fig:da_sizevariation1} (blau). To find the columns that contain the guide wire and the corresponding shadow, we use the original image. The width of the wire is approximately the same in each image, so we assume a static number of 25 columns lined up directly next to each other. It should be mentioned that all column calculations are done using a wraparound, which means that intervals may exceed the boundaries of the image. To determine the position of the guide wire, we set the upper 75 rows of the image to zero again. Then we sum up the gray values for each column and determine the sequence of 25 adjacent columns whose gray value sum results in the smallest overall value. In which sections the curve exceeds the selected threshold can be found out by scanning each column from above. The first white pixel determines the height of the curve in the respective column. If no white pixel is found, the bottom edge of the image is taken as the height. Once we have excluded the columns described above, we look for the largest possible interval (with wraparound) in which the curve does not cross the threshold and no guide wire is contained. This interval is indicated by a red line at the top of the left most image, marking all columns that may be shifted.
+
+Now the columns can be shifted up or down. For an authentic shifted curve we utilize the Hann function, which is a similar approximation to the real curves in the B-scans:
+\begin{equation}
+h_{0}(x) =
+\begin{cases}
+\frac{1}{L} \cos ^{2}\left(\frac{\pi x}{L}\right), & |x| \leq L / 2 \\
+0, & |x|>L / 2
+\end{cases}.
+\end{equation}
+The advantage of the Hann function is that it approaches zero and is zero outside the interval \( \pm L/2 \). Moreover, it has its maximum of one centered in the origin of the x-axis regardless of what value L is equal to. A Hann function with \( L \) equal the interval length is moved into the positive direction, such that it starts in the x-y-origin. We take the length of the previously determined column interval and create a series of the same width by inserting the indices of each column into the Hann function. The scalar by which the Hann window is multiplied results randomly from an interval between zero and the maximum distance from the above threshold to the curve. After rounding the values of the Hann window to integer values, the columns are shifted according to the corresponding index either in positive or negative direction. 
+
+For shifting a section in a column we set an additional threshold indicated by the second continuous horizontal line (green). In a column, only the pixels below the 683rd row are ever shifted. If the column sections are shifted up by \( n \) pixels, we cut them off starting at the threshold. At the bottom, we append pixels accordingly by mirroring the column at the bottom row. When the column is shifted down, the missing pixels are replaced by mirroring the column at the threshold height. Accordingly, the threshold was chosen so that there is always space between the curve and the threshold to take corresponding pixels from there.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.32\textwidth]{./figures/DA1/im_261.h5cart-0.png}\hfill
+    \includegraphics[width=.32\textwidth]{./figures/DA1/im_261.h5cart-1.png}\hfill
+    \includegraphics[width=.32\textwidth]{./figures/DA1/im_261.h5cart-2.png}
+    \caption[\Acrshort{da} technique: cartesian vessel form variation]{A \acrshort{da} technique varying the form and diameter size of an \acrshort{ivoct} frame in cartesian format. The original image (center) compared to the size variation with a positive scaled Hann window (left) and a negative scaled Hann window (right). Note that all three images on the right are modified for illustration purposes, such that they have a more uniformly distributed histogram.}
+    \label{fig:da_sizevariation2}
+\end{figure}
+The final images (see \cref{fig:da_sizevariation1}) can also be transformed into cartesian format as in \cref{fig:da_sizevariation2}, giving a relatively authentic representations of a cross-sectional frame.
+
+\subsection{Artefact Imitation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.24\textwidth]{./figures/DA2/set39_im_347_orig_markers.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA2/set39_im_347_extraGuidewire_markers.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA2/set39_im_347_removeBlood_markers.png}\hfill
+    \includegraphics[width=.24\textwidth]{./figures/DA2/set39_im_347_WhiteColumns_markers.png}
+    \caption[\Acrshort{da} technique: artefact imitation]{Three \acrshort{da} techniques applied, imitating \acrshort{ivoct} artefacts. The first image shows the original \Gls{b-scan}. The other images illustrate artefact imitations, marked with the red dashed circles. The second frame shows an extra guidewire insertion, the third imitates blood artefacts and the fourth white noisy column areas. Note that all three images on the right are modified for illustration purposes, such that they have a more uniformly distributed histogram.}
+    \label{fig:artefactrecreation}
+\end{figure}
+When having a close look at an \acrshort{ivoct} scan, one can frequently observe three main kinds of artefacts \cite{GuillermoJ.Tearney.2012}. These can influence the performance of \acrshort{nn} models, when training on \acrshort{ivoct} data sets, significantly. One of the most significant artefacts is caused by the guide wire, which leads to a bright reflection in form of a semi circle and a dark shadow, that covers the anatomy behind it. Secondly, one can observe multiple artefacts of various forms that are seemingly random distributed over the entirety of the lumen. Those artefacts are mostly caused by blood residues that reflect light well. Lastly, one can observe brighter groups of columns independently distributed of the actual image content. These brighter fading columns have an overall gradient from the top to the bottom with multiple stationary points. Fading in and out on the horizontal axis is mixed with random deviation. Highlighting is not only additive but depends on the reflection signal itself, so they contain a certain amount of noise.
+
+Based on the described artefacts we introduce multiple ways of augmenting the image data set accordingly. We attempt to recreate the described artefacts by modifying the \Gls{b-scan} in polar format. In this format artefacts are easier to imitate. It further yields the advantage that artefacts that only occur due to the cartesian transformation can be taken into account as well.
+
+Or first approach describes the additional creation of a guidewire reflection and its randomly positioned shadow (see \cref{fig:artefactrecreation}, frame two). We manually chose an image with a guidewire positioned comparatively close to the catheter and cut it out. This gives us the possibility to insert the cutout randomly into other \Gls{b-scan} in an attempt to make the network invariant to guidewire positioning. To insert the artifact in realistic positions, we make sure to only choose these, where the tunica is far enough away from the catheter. The range of columns where we allow the artifact insertion is therefore computed similarly as described in the tunica variation section with a threshold of of height 613 pixels. Also, we vary the insertion height by 10 pixels to each side.
+
+Next to the guidewire, blood artefacts can be imitated artificially to a certain extend as well (see \cref{fig:artefactrecreation}, frame three). This is done by creating a Gaussian array (1024x1024 pixels) and masking it with its mean threshold. We then label objects with their size and remove those with a size greater or equal of 1000 pixels. We then convert it with a binary threshold, resize the mask to 319x347 pixels and apply a Gaussian filter with a standard deviation value of one. Afterwards the mask is scaled by a factor of 0.02 and added to the upper half of the original image, which is near to where the blood artifacts usually occur as well. Finally we obtain an augmented image with three to six additional artifacts.
+
+The last artefact we imitate is formed by column groups with irregularly high intensities in different regions (see \cref{fig:artefactrecreation}, frame four). We imitate this artefact, first, by creating a zero vector for each dimension that has cardinalities equal to the number of columns and rows. Both vectors are supplemented with a Hann window. The first has a width in the range of 40 to 60 is added in a random position and the second has a width between 180 and 220. After both summations, only the first vector is multiplied by an array of the according cardinality that is populated with random samples from a uniform distribution over [0, 1). Then the second vector with a cardinality equal to the number of rows, is replicated to a matrix of the image shape. We perform a multiplication with the first vector and scale it by a factor of five. Finally, the resulting matrix is multiplied with the original image. Previously applied steps are repeated ten times such that we get a set of artifacts we can add to the image.
+
+\subsection{Histogram Equalization}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}{1\textwidth}
+    \includegraphics[width=1\textwidth]{./figures/DA3/Figure_1_sci_cropped.png}
+    \end{subfigure}
+    \begin{subfigure}{1\textwidth}
+    \includegraphics[width=1\textwidth]{./figures/DA3/Figure_2_sci_cropped.png}
+    \end{subfigure}
+    \caption[\Acrshort{clahe} \gls{histogram} equalization]{Two \acrshort{ivoct} images \glspl{histogram} with and without a \acrshort{clahe} filter are compared (upper and lower one).}
+    \label{fig:histograms}
+\end{figure}
+
+\Gls{histogram} equalization may increase the performance of task like image analysis, object detection, and image segmentation \cite{Campos.2019}. Generally, performance of \acrshortpl{cnn} can be improved by pre-processing image data with \gls{histogram} equalization in scenarios where training data is limited or small \cite{Mahmood.2018}. It may help to overcome the limitations of global approaches by performing local contrast enhancement. \Gls{histogram} equalization is used to improve contrast in images by stretching out local intensity ranges. This increases the contrast of an image, even when it was represented by close values before. \Acrfull{clahe} redistributes the intensity values of an image by computing histograms corresponding to distinct image sections. It relies on two hyperparameters, the number of tiles and the clip limit. The tile defines the size of image sections considered and the clip limit defines a maximum contrast to prevent noise over amplification.
+
+\section{Conducted Experiments}
+
+Our workflow consists of four main steps, described in the following. First, we subdivide our data to make use of \acrshort{cv} with a holdout. Secondly, we test for the mostly suited general model parameters and pre-processing transformations to use for the following experiments. Third, \acrshort{da} techniques are tested and their effects compared. Finally we find an optimal combination of those \acrshort{da} techniques that have a positive impact on the model performance and rule out those with a negative impact.
+
+\subsection{Subdivision}
+
+As our pipeline performs K-fold \acrshort{cv}, we have to divide our data set into \( k \) mutual exclusive subsets. The expectation is that low values of \( k \) would result in a noisy estimate of model performance and large values lead to overly high computational costs. The preferred way would be to freely subdivide the data set and find an optimal value for \( k \), by testing all possible values of \( k \) and calculating the covariance. However, this is not applicable due to the data set structure where not all images are completely independent to each other. Thus in our case it makes more sense to decide for a fixed number of \( k = 7 \) subsets. Since our data set is composed of 56 different unrelated frame sequences we hold out seven of them as a distributed test set. The others 49 sets are used to train the model, where in each \acrshort{cv} step seven sequences are chosen as a validation set. Note that all of our \acrshort{da} techniques are online augmented, that is, we only store the original data and execute all transformations in real time as part of the data loader. No actual enlargement of the data set size takes place and thus hard drive storage and resources can be saved. Validation and testset are excluded from \acrshort{da}, but pre-processing transformations are applied to all images.
+
+\subsection{Hyperparameters}
+
+To get decent results, we set a standard initial configuration for our model that is based on generally very common hyperparameters for comparative setups. Cost functions and optimizer are chosen to be cross-entropy and Adam optimizer for all experiments, because they generally performs best on binary image classification \acrshortpl{cnn} among the adaptive optimizers that automatically tune the \gls{learning-rate} \cite{VaniS..2019}. We prepare our experiments by conducting a variety of tests to find generalized behaviour on hyperparameters (e.g. initial lr or batch size) to narrow down or rule out their influence for simplified analysis.
+
+Some of the unknown model hyperparameters we want to optimize in pre-tests are values for the initial \gls{learning-rate} and batch size, since these have by far the greatest influence on training behavior.
+%
+Another question to be answered is if pre-training our model with \Gls{imagenet} gives any benefits. Related to this, we normalize our data sets mean and standard deviation to either 0.5 or \Gls{imagenet} itself with mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225]. We further check if rescaling, mean normalization or standardization leads to the highest model performance, when conducting supervised learning with IVOCT data.
+%
+Since we use ResNet-18 for our experiments, it remains unclear whether the model benefits from higher performance if we either pad or if we replicate the image to a 3-channel image.
+% measure performance by peak point of learning curve
+%
+Our PyTorch pipeline uses \acrshort{acc} as a measure for early stopping. We want to find the best parameters for early stopping patience as well as early stopping \acrshort{acc}. The threshold (early stopping \acrshort{acc}) defining how long the model continues training is chosen simply by observing the models variance at the time where the validation \acrshort{acc} for each epoch is around its highest value. To make sure early stopping is triggered early enough, we double the observed variance and take it as stopping \acrshort{acc}. Early stopping patience is tested for a range of values between x and y epochs. We observe around which epoch the models validation accuracy finds its maximum before decreasing and how many epochs it takes such that we can assume that no further improvement takes place. This number of epochs is chosen as early stopping patience.
+%
+Through this approach it is made sure to recognize when the model still improves slowly with a slight oscillation and not stop too early. The training process stops at a maximum of 50 epochs. After the training has ended, the model with the least validation loss during training was used avoiding excessive overfitting to make predictions on the test set. From the results further performance measures are derived.
+%
+Because early stopping and L2 regularization have similar effects on generalization, we perform two different types of tests, that is: run a first experiment where we only apply L2 regularization and second, run one only with early stopping.
+%
+For comparability, we employ dropout just like Gessert did \cite{Gessert.2018} with a probability of p=0.5 before the output of every model.
+
+\subsection{Tests}
+
+Finally it is left open if training with cartesian images is always to be preferred over images in polar format. Customized multi-path architecture using both representations for an effective feature exploitation may be developed further in the future \cite{Gessert.2018}. We therefore consider both variants if possible and test \acrshort{da} techniques tailored to each representation if applicable. It is important to mention that transformation to cartesian format changes the maximum value due to cubic \gls{interpolation} of the image drastically. Most filters applied to images in cartesian format distort the circles border and when they are applied before the the transformation their effect might be reduced due to \gls{interpolation}, especially towards the center of the image. A Gaussian convolution filter, for instance, blurs and thus distorts the edge of the circle to the extent of its kernel diagonal in pixel units. This is why the order of applied transformations including \acrshort{da} and pre-processing might effect the models performance. Therefore we note that the order of pre-processing steps plays a crucial role.
+
+But not only the order of pre-processing transformations must be considered. The application sequence of \acrshort{da} techniques has to be taken into account as well. Its importance can be clearly explained by considering a \gls{b-scan} in polar representation. If it is converted to cartesian format in the way described above, the upper pixel information is squeezed to the center of the image. In the case we flip the image before, exactly the opposite effect happens. The pixels previously positioned at the bottom of the image are squeezed to its center. If, on the other hand, the image is flipped after the polar transformation takes place, this is equivalent to shifting the polar image by half of the horizontal image width beforehand.
+
+After suitable hyperparameters without DA have been determined, detailed DA tests can be performed. In order to be able to meaningfully evaluate the effect of individual techniques, the tested models are compared with a suitable reference model in each case. The reference model can be trained with DA, but is not required to be. The training data of the compared models only differ in the respective investigated method. To obtain meaningful results, some techniques may be combined. By transformations using random variables, the results of some tests vary when run repeatedly. However, these are marginal due to repeated training in multiple epochs and can therefore be neglected. In the following, we list which DA techniques are tested. This is to determine how large their positive or negative effect is on the performance of the generated model. Using the knowledge gained from the behavior of the methods, an optimal strategy of combined DA techniques for training with \acrshort{ivoct} data is developed.  
+
+First, simple \textbf{affine transformations} are tested. This includes shifting and rotation in different intensities. Depending on the results of the first tested affine transformations, we examine further \acrshort{ivoct} specific affine transformations, such as stretching, shearing and scaling, again in different intensities. They take advantage of certain properties and commonalities of the individual frames. Firstly, less or no information about the anatomy can be found in the lower part of the frames. It denotes the vertical multiplication of all y-coordinates, where the upper edge of the frame represents the x-axis with \( y = 0 \). After interpolation an overlap by \( n \) pixels is cut off at its lower edge. \( n \) is randomly chosen from a given interval. \Glspl{b-scan} have similar feature positions along the temporal dimension that fit well within the context of the other A-scans. Thus, horizontal shearing scales the image from a centered origin along the temporal axis cutting off a random number of \( x \in [0, n/2] \) overlapping columns after bilinear interpolation. The new images are similar to the original one, but comes with varied waveforms. Because left and right edges of the frame do no longer fit together after applying the cartesian transformation, further artifacts emerge. Scaling differs from the other transformations in that it crops all image edges instead of specific sides only. Secondly, we augment our data set by applying the \textbf{elastic deformation} transformation by Simard \cite{Simard.2003}. Different types of non-linear \textbf{intensity shifts}, such as contrast jittering, brightness jittering, \acrshort{clahe} and Davella's filter \cite{Devalla.2018} are investigated. Furthermore we test whether \textbf{convolutional filters} such as Gaussian noise, salt and pepper noise, and gaussian blur have any measurable effects on the performance. Next, the effect of  \textbf{partial masking} (random and guide wire removal) is investigated. Finally, new techniques are applied with additional complexity. These include \textbf{artefact imitation} like tunica variation, intense columns and blood speckle.
+
+
