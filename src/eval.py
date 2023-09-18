@@ -37,7 +37,7 @@ class Eval():
     def calc_metrics(self, predictions, targets, targets_tensor, num_out):
         accuracy = np.mean(np.equal(np.argmax(predictions, 1), targets))
         conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1))
-        print("Confusion matrix: ", conf_matrix)
+        print("Confusion matrix:\n", conf_matrix)
         weighted_accuracy = conf_matrix.diagonal() / conf_matrix.sum(axis=1)
         sensitivity = np.zeros([num_out])
         specificity = np.zeros([num_out])
