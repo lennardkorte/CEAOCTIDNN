@@ -3,9 +3,11 @@
 green=`tput setaf 2`
 reset=`tput sgr0`
 
-name_image="image-iddatdloct"
-name_container="container-iddatdloct"
+date=$(date '+%Yy-%mm-%dd_%Hh-%Mm-%Ss')
+name_image="image-${date}"
+name_container="container-${date}"
 filename="train_and_test.py"
+data_path="/docker_data/data"
 
 echo -e "${green}\n\nBuilding docker-image...${reset}"
 docker build -t $name_image .
@@ -19,11 +21,12 @@ docker image ls
 
 echo -e "${green}\n\nRun docker-image:${reset}"
 args="$@"
+s_path="${PWD}/data"
 docker run \
 -it --rm \
 --gpus all \
 --shm-size 8G \
 --name $name_container \
---mount type=bind,source=/home/Korte/IDDATDLOCT/data,target=/IDDATDLOCT/data \
+--mount type=bind,source=$s_path,target=$data_path \
 -i $name_image "src/${filename} ${args}"
 
