@@ -205,7 +205,7 @@ $ ls -la /dev | grep nvidia
 
     $ sudo systemctl restart docker
     ```
-3. Availability of GPU's in Docker can be testes with the following command: 
+3. Availability of GPU's in Docker can be testes with the following command (current version-tag [here](https://hub.docker.com/r/nvidia/cuda/tags?page=1&name=11.0.3-base-)): 
     ```bash
     $ sudo docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
     ```
