@@ -23,7 +23,8 @@ echo -e "${green}\n\nRun docker-image:${reset}"
 args="$@"
 s_path="${PWD}/data"
 docker run \
--it --rm \
+-it \
+--rm \
 --gpus all \
 --shm-size 8G \
 --name $name_container \
