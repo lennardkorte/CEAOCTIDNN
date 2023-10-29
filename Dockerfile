@@ -8,8 +8,7 @@ RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 
 ADD /src /docker_data/src/
-ADD /config.json /docker_data/config.json
-ADD /tests /docker_data/tests/
+ADD /runs /docker_data/runs/
 
 WORKDIR /docker_data/
 ENTRYPOINT ["python3", "-u", "/docker_data/src/main.py"]

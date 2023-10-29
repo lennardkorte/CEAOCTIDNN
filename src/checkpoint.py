@@ -1,7 +1,6 @@
 
 import os
 from pathlib import Path
-import wandb
 import torch
 import copy
 
@@ -14,6 +13,7 @@ from collections import namedtuple
 from torch.nn.parallel.data_parallel import DataParallel
 
 from eval import Eval
+from utils_wandb import Wandb
 from config import Config
 from models import *
 
@@ -25,6 +25,7 @@ class Checkpoint():
     
     model_map = {
         'ResNet18': ResNet18,
+        'ResNet18AutEnc': create_autoencoder,
         'ResNext50': ResNext50,
         'WideResNet50': WideResNet50,
         'AlexNet': AlexNet,
@@ -36,7 +37,7 @@ class Checkpoint():
     def __init__(self, name:str, save_path_cv:Path, device:device, config:Config):
         ''' Creates the first checkpoint of the training process.
         Stores most important components of the training process, e.g.: model, optimizer, wandb_id, etc.
-        Note: DataLoaders are not stored in checkpoints. In deterministic deterministic (incl. shuffling).
+        Note: DataLoaders are not stored in checkpoints. In deterministic (incl. shuffling).
 
         Arguments:
             self: The Checkpoint object itself.
@@ -51,10 +52,12 @@ class Checkpoint():
         self.scaler = torch.cuda.amp.GradScaler()
         self.optimizer = self.get_new_optimizer(self.model, config['learning_rate'], config['optimizer'])
         self.start_epoch = 1
-        self.wandb_id = wandb.util.generate_id()
+        if config["enable_wandb"]:
+            self.wandb_id = Wandb.get_id()
         self.eval_valid = None
         self.eval_valid_best = None
         
+        # Load existing checkpoint
         model_found = False
         for checkpoint_path in glob(str(save_path_cv / '*.pt')):
             if name in checkpoint_path:
@@ -66,7 +69,8 @@ class Checkpoint():
                 self.optimizer.load_state_dict(checkpoint['Optimizer'])
                 self.scaler.load_state_dict(checkpoint['Scaler'])
                 self.start_epoch = checkpoint['Epoch'] + 1
-                self.wandb_id = checkpoint['Wandb_ID']
+                if config["enable_wandb"]:
+                    self.wandb_id = checkpoint['Wandb_ID']
                 self.eval_valid = namedtuple("eval_valid", checkpoint['eval_valid'].keys())(*checkpoint['eval_valid'].values())
                 self.eval_valid_best = namedtuple("eval_valid_best", checkpoint['eval_valid_best'].keys())(*checkpoint['eval_valid_best'].values())
                 break
@@ -74,18 +78,22 @@ class Checkpoint():
         if not model_found:
             print(f'No Model with "{name}" found. Train from first epoch.')
     
-    def update_eval_valid(self, eval_valid:Eval) -> None:
+    def update_eval_valid(self, eval_valid:Eval, config) -> None:
         
         if self.eval_valid_best is None:
             self.eval_valid_best = copy.deepcopy(eval_valid)
             
         if self.eval_valid is not None:
-            if eval_valid.metrics[8] > self.eval_valid.metrics[8]:
-                self.eval_valid_best = copy.deepcopy(eval_valid)
+            if config["auto_encoder"]:
+                if eval_valid.mean_loss < self.eval_valid_best.mean_loss:
+                    self.eval_valid_best = copy.deepcopy(eval_valid)
+            else:
+                if eval_valid.metrics[8] > self.eval_valid_best.metrics[8]:
+                    self.eval_valid_best = copy.deepcopy(eval_valid)
         
         self.eval_valid = eval_valid
     
-    def save_checkpoint(self, name:str, epoch:int, save_path_cv:Path) -> None:
+    def save_checkpoint(self, name:str, epoch:int, save_path_cv:Path, config:Config) -> None:
         ''' Saves the current model under specified name.
 
         Arguments:
@@ -101,10 +109,12 @@ class Checkpoint():
             'Model': self.model.state_dict(),
             'Optimizer': self.optimizer.state_dict(),
             'Scaler': self.scaler.state_dict(),
-            'Wandb_ID': self.wandb_id,
             'eval_valid': vars(self.eval_valid),
             'eval_valid_best': vars(self.eval_valid_best)
         }
+        if config["enable_wandb"]:
+            state.update({'Wandb_ID': self.wandb_id})
+
         torch.save(state, save_path_cv / (name + '_at_epoch_' + str(epoch) + '.pt'))
     
     @classmethod
@@ -122,7 +132,7 @@ class Checkpoint():
         if config['model_type'] not in cls.model_map:
             raise ValueError('Name of model "{0}" unknown.'.format(config['model_type']))
         else:
-            model = cls.model_map[config['model_type']](config['num_out'], config['pretrained'])
+            model = cls.model_map[config['model_type']](config)
             
         if len(config['gpus']) > 1:
             model = nn.DataParallel(model)
@@ -149,7 +159,7 @@ class Checkpoint():
             return optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9) # TODO: Momentum needed?
         else:
             #return optim.Adam(model.parameters(), lr=learning_rate)
-            return optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-2)
+            return optim.Adam(model.parameters(), lr=learning_rate) # TODO:, weight_decay=1e-2)
 
     @staticmethod
     def delete_checkpoint(name, epoch, save_path:Path) -> None:

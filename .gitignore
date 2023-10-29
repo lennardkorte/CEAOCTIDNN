@@ -1,17 +1,9 @@
 
-# Confident files
-quick_script.sh
-config.json
-
 # Large file directories
 data/**
-academic_work/citavi/IDDATDLOCT/Citavi Attachments/**
 
 # System management files
 **/.DS_Store
-
-# File created when installing Docker
-get-docker.sh
 
 # Python compilation directories
 **/__pycache__

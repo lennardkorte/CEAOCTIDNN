@@ -1,0 +1,14 @@
+
+{
+    "group": "decoder",
+    "overwrite_run": true,
+    "model_type": "ResNet18AutEnc",
+    "loss_function": "MSELoss",
+    "auto_encoder": true,
+    "encoder_group": "classifier",
+    "early_stop_patience": 10,
+    "learning_rate": 1e-3,
+    "num_cv": 1,                        
+    "epochs": 300,
+    "wb_project": "CEIMPA"
+}

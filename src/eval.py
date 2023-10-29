@@ -1,12 +1,17 @@
 
+from pathlib import Path
 import torch
 import numpy as np
 import math
+import os
+import torch.nn.functional as F
+from PIL import Image
+from torchvision.transforms import ToPILImage
 
 from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 
 class Eval():
-    def __init__(self, dataloader, device, model, loss_function, num_out):
+    def __init__(self, dataloader, device, model, loss_function, config, save_path_cv):
         model.eval()
         
         for i, (inputs, labels) in enumerate(dataloader):
@@ -15,24 +20,56 @@ class Eval():
             
             with torch.set_grad_enabled(False):
                 with torch.cuda.amp.autocast():
+
                     outputs = model(inputs)
-                    loss = loss_function(outputs, labels)
+                    
+                    if config["auto_encoder"]:
+                        # Rescale input image to compare it with output image
+                        first_channel = inputs[:,:1,:,:]
+                        input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        loss = loss_function(outputs, input_scaled)
+                        
+                        if True: # TODO
+                            # Extract the 32x32 slice from the tensor
+                            image_slice_in = input_scaled[0, 0, :, :]
+                            image_slice_out = outputs[0, 0, :, :]
+
+                            images_max = max(image_slice_in.max(), image_slice_out.max())
+                            images_min = min(image_slice_in.min(), image_slice_out.min())
+                            image_in = (255 * (image_slice_in - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+                            image_out = (255 * (image_slice_out - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+
+                            to_pil = ToPILImage()
+                            image_in_pil = to_pil(image_in)
+                            image_out_pil = to_pil(image_out)
+
+                            # Save the image as a PNG file
+                            img_dir = save_path_cv / "example_images/"
+                            os.makedirs(img_dir, exist_ok = True)
+                            image_in_pil.save(img_dir / f"{i}_input.png", "PNG")
+                            image_out_pil.save(img_dir / f"{i}_output.png", "PNG")
+
+                    else:
+                        loss = loss_function(outputs, labels)
             
             if i == 0:
                 loss_all_tensor = loss.unsqueeze(0)
-                predictions_tensor = outputs
-                targets_tensor = labels
+                if not config["auto_encoder"]:
+                    predictions_tensor = outputs
+                    targets_tensor = labels
             else:
                 loss_all_tensor = torch.cat([loss_all_tensor, loss.unsqueeze(0)], 0)  # input (t*batch, cxbxwxh)
-                predictions_tensor = torch.cat([predictions_tensor, outputs], 0)
-                targets_tensor = torch.cat([targets_tensor, labels], 0)
+                if not config["auto_encoder"]:
+                    predictions_tensor = torch.cat([predictions_tensor, outputs], 0)
+                    targets_tensor = torch.cat([targets_tensor, labels], 0)
         
         # To numpy arrays
-        self.predictions = predictions_tensor.cpu().numpy()
-        self.targets = targets_tensor.cpu().numpy()
         self.mean_loss = np.mean(loss_all_tensor.cpu().numpy())
-        
-        self.metrics = self.calc_metrics(self.predictions, self.targets, targets_tensor, num_out)
+        if not config["auto_encoder"]:
+            self.predictions = predictions_tensor.cpu().numpy()
+            self.targets = targets_tensor.cpu().numpy()
+            
+            self.metrics = self.calc_metrics(self.predictions, self.targets, targets_tensor, config['num_out'])
     
     def calc_metrics(self, predictions, targets, targets_tensor, num_out):
         accuracy = np.mean(np.equal(np.argmax(predictions, 1), targets))

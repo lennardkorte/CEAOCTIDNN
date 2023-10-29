@@ -1,5 +1,6 @@
 
 import os
+import shutil
 import sys
 
 from pathlib import Path
@@ -11,7 +12,6 @@ from argparse import ArgumentParser
 from utils import Utils
 
 NAME_CONFIG_FILE_STANDARD = 'config_standard.json'
-NAME_CONFIG_FILE = 'config_standard.json'
 
 class Config(dict):
     ''' The "Config" object acts like a "dict", is initialized and represents the actual
@@ -63,14 +63,17 @@ class Config(dict):
         # Adds random other arguments to the config file.
         modification = {opt.target : getattr(args, self._get_opt_name(opt.flags)) for opt in options}
         self.config = self._update_config(config, modification)
+
         
-        # Create main directory to store the test.
         self.save_path = Path('./data/train_and_test', config['group'], config['name'])
+        # Detele previous run
+        if config['overwrite_run']: shutil.rmtree(self.save_path, ignore_errors=True)
+        # Create main directory to store the run.
         os.makedirs(self.save_path, exist_ok=True)
 
         # Checks if copy of the same config as a file is already existing or not. If not, creates new one.
         # Warns user with a dialogue when config changed, in case a program tries to continue.
-        config_file_copy_path = self.save_path / NAME_CONFIG_FILE
+        config_file_copy_path = self.save_path / 'config.json'
         if os.path.isfile(config_file_copy_path) and not Utils.read_json(config_file_copy_path) == config:
             if config['overwrite_configurations']:
                 print('This model has been trained with a different config before. Sure that you want to run this with a changed configuration file? Run with different name is recommended.')

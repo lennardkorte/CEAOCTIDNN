@@ -132,7 +132,7 @@ The current model is saved in `latest_checkpoint.pt` after each epoch, while fin
   │   ├── utils_wandb.py            - Wandb logging class
   │   └── utils.py                  - Helper functions and utilities
   │
-  ├── tests/                - holds all tests and corresponding configurations for academic work
+  ├── runs/                - holds all tests and corresponding configurations for academic work
   │
   ├── .dockerignore         - manages build files for docker
   │

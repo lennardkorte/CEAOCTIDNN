@@ -821,7 +821,7 @@ class DataAugmentationTechniques():
             T.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),
             
             # Padding
-            # TODO: randomize
+            # : randomize
             #T.Pad(padding=0, fill=0, padding_mode='constant'), # other padding modes: edge, reflect, symmetric
             
             # Cropping: Crops the given image at the center. 
@@ -829,7 +829,7 @@ class DataAugmentationTechniques():
             T.RandomCrop(size=image.shape, padding=10, fill=0, padding_mode='constant'), # edge, reflect or symmetric
             
             # Resizing, stretching, squeezing, repositioning
-            # TODO: Randomize
+            #  :Randomize
             #T.Resize(size=(200,200)),
             # random crop, random aspect ratio, resize
             T.RandomResizedCrop(size=image.shape, scale=(0.5, 1.0), ratio=(1.0, 1.0)), # also used in Inception networks

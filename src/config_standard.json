@@ -1,7 +1,8 @@
 
 {
-    "name": "run0",
+    "name": "run_0",
     "group": "group0",
+    "overwrite_run": false,
     
     "use_cuda": true,
     "deterministic_training": true,
@@ -19,7 +20,8 @@
     "preload": false,
     "batch_size": 128,
     
-    "enable_wandb": false,
+    "enable_wandb": true,
+    "wb_project": "new_project",
     "send_final_results": true,
     "b_logging_active": false,
 
@@ -36,5 +38,8 @@
 
     "define_sets_manually": true,
     "c2_or_c3": "ivoct_both_c2/",       
-    "cart_or_pol": "orig"
+    "cart_or_pol": "orig",
+    
+    "auto_encoder": false,
+    "encoder_group": "group0"
 }

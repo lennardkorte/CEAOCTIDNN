@@ -1,7 +1,0 @@
-
-{
-    "batch_size": 128,
-    "calc_train_error": false,  
-    "enable_wandb": true,
-    "group": "group-learningrate"
-}

@@ -3,6 +3,5 @@
 
 # Allow files and directories
 !/src/**
-!/tests/**
+!/runs/**
 !/requirements.txt
-!/config.json

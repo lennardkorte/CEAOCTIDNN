@@ -8,6 +8,7 @@ import json
 
 import numpy as np
 import torch.nn as nn
+import torch.nn.functional as F
 
 from pathlib import Path
 from collections import OrderedDict
@@ -81,16 +82,33 @@ class Utils():
             
             optimizer.zero_grad()
             
+            """
+            for i, child1 in enumerate(model.children()):
+                for j, (name, module) in enumerate(child1.named_children()):
+                    for param in module.parameters():
+                        print(i, j, name, param.requires_grad)
+            """
+
             with torch.set_grad_enabled(True):
                 with torch.cuda.amp.autocast():
+
                     outputs = model(inputs)
-                    loss = loss_function(outputs, labels)
+
+                    if config["auto_encoder"]:
+                        first_channel = inputs[:,:1,:,:]
+                        input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        
+                        loss = loss_function(outputs, input_scaled)
+                    else:
+                        loss = loss_function(outputs, labels)
                 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
                 
-            Wandb.wandb_train_one_epoch(loss, optimizer, config)
+            if config["enable_wandb"]:
+                Wandb.wandb_train_one_epoch(loss, optimizer, config)
+
             sys.stdout.write("\033[K")
         
         return time.time() - start_it_epoch
