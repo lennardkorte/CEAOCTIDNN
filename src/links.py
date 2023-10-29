@@ -1,5 +1,5 @@
 
-"""
+""" TODO: remove this file
 https://github.com/julianstastny/VAE-ResNet18-PyTorch/blob/master/model.py
 
 @article{odena2016deconvolution,
