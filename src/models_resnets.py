@@ -116,6 +116,7 @@ class ResNetEncoder(nn.Module):
 
 class ResNetDecoder(nn.Module):
 
+    # use inverted configs as argument to create decoder, i.e.g: configs[::-1]
     def __init__(self, configs, bottleneck=False):
         super(ResNetDecoder, self).__init__()
 
@@ -511,7 +512,6 @@ class DecoderBottleneckLayer(nn.Module):
         return x
 
 if __name__ == "__main__":
-
     
     configs, bottleneck = get_configs("resnet18")
 
