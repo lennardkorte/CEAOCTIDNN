@@ -30,7 +30,7 @@ class Eval():
                         loss = loss_function(outputs, input_scaled)
                         
                         if True: # TODO
-                            # Extract the 32x32 slice from the tensor
+                            # Extract the slice (single channel image) from the tensor
                             image_slice_in = input_scaled[0, 0, :, :]
                             image_slice_out = outputs[0, 0, :, :]
 
