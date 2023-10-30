@@ -98,7 +98,7 @@ class DatasetPreparation():
             split_point = int((length / 100) * self.config['set_percntage_val'])
             train_ind_subdivision = [set_cv_ind[:split_point], set_cv_ind[split_point:]]
         else:
-            warnings.warn('Set num_cv to zero or min. 4 for reasonable results.')
+            warnings.warn('Set num_cv to zero or min. 4 for reasonable results.') # TODO: warining or assert?
             exit()
             
         return test_ind, train_ind_subdivision

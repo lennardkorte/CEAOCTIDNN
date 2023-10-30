@@ -1,7 +1,7 @@
 
 {
     "name": "run_0",
-    "group": "group0",
+    "group": "group_0",
     "overwrite_run": false,
     
     "use_cuda": true,
@@ -41,5 +41,6 @@
     "cart_or_pol": "orig",
     
     "auto_encoder": false,
-    "encoder_group": "group0"
+    "encoder_group": "group_0",
+    "encoder_name": "rum_0"
 }

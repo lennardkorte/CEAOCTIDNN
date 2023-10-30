@@ -923,7 +923,7 @@ class DataAugmentationTechniques():
             
         ]
         post_transforms = [
-            T.Resize(size=output_shape),
+            T.Resize(size=output_shape, antialias=True),
             AddDoubleZeroPadding(),
             #ThreeChannelCopy(),
             #Standardization_IN(),

@@ -29,8 +29,6 @@ class Checkpoint():
         'ResNext50': ResNext50,
         'WideResNet50': WideResNet50,
         'AlexNet': AlexNet,
-        'SENet': SENet,
-        'EfficientNetB6': EfficientNetB6,
         'DenseNet121': DenseNet121
     }
     

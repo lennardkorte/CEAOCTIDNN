@@ -11,7 +11,7 @@ class Wandb():
             if config['wandb'] is not None :
                 os.environ['WANDB_API_KEY'] = config['wandb']
             else:
-                print('W&B is missing API key argument from this program. See docs for more information.')
+                print('W&B is missing API key argument from this program. See docs for more information.') # TODO: warning or assert?
                 exit()
                 
             Logger.print_section_line()
