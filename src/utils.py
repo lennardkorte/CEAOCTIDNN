@@ -82,13 +82,6 @@ class Utils():
             
             optimizer.zero_grad()
             
-            """
-            for i, child1 in enumerate(model.children()):
-                for j, (name, module) in enumerate(child1.named_children()):
-                    for param in module.parameters():
-                        print(i, j, name, param.requires_grad)
-            """
-
             with torch.set_grad_enabled(True):
                 with torch.cuda.amp.autocast():
 
