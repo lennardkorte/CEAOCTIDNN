@@ -13,6 +13,8 @@
     "num_out": 2,
     "loss_function": "cross_entropy",
     "optimizer": "Adam",
+    "weight_decay": 0.0,
+    "momentum": 0.9,
 
     "set_percentage_cv": 80,           
     "set_percentage_val": 20,           
@@ -22,7 +24,6 @@
     
     "enable_wandb": true,
     "wb_project": "new_project",
-    "send_final_results": true,
     "b_logging_active": false,
 
     "calc_train_error": true,           
