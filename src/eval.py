@@ -70,36 +70,6 @@ class Eval():
                             # Save the image as a PNG file
                             segmentation_image.save(img_dir / f"{i}_segmentation.png")
 
-                            
-                            
-                            """
-                            # Print superpixel image
-                            transform = T.Compose([T.ToTensor(), ToSLIC(n_segments=75, add_seg=True, add_img=True)])
-                            data = transform(abs_diff_pil)
-                            
-                            # TODO remove two lines
-                            # segmented_image_pil = to_pil(data.seg[0])
-                            # segmented_image_pil.save(img_dir / f"{i}_diff.png", "PNG")
-
-                            # Access the superpixel representation and other attributes
-                            superpixel_data = data.x  # Contains the mean color of superpixels
-                            superpixel_positions = data.pos  # Contains the centroids of superpixels # unused
-                            segmentation_result = data.seg.astype(np.uint8)  # Contains the segmentation result
-
-                            print(superpixel_data.shape)
-                            
-                            # Convert the superpixel data to a PIL image and save it
-                            superpixel_image = to_pil(superpixel_data)  # Convert to grayscale
-                            superpixel_image.save(img_dir / f"{i}_superpixel.png", "PNG")
-
-                            # Convert the segmentation result to a PIL image and save it
-                            segmented_image = to_pil(segmentation_result)  # Convert to grayscale
-                            segmented_image.save(img_dir / f"{i}_segmented.png", "PNG")
-
-                            exit()
-                            """
-                            
-
                     else:
                         loss = loss_function(outputs, labels)
             
