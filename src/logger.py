@@ -1,5 +1,6 @@
 
 import sys
+import json
 
 class Logger(object):
     def __enter__(self):
@@ -44,3 +45,72 @@ class Logger(object):
     def printer_ae(title, early_stop_accuracy, mean_loss):
         print('\n' + title)
         print("   Loss:        ", round(mean_loss, early_stop_accuracy))
+
+    @staticmethod
+    def log_test(file_log_test_results, description, config, eval_test):
+            try:
+                # Try to open the JSON file for reading (if it exists)
+                with open(file_log_test_results, 'r') as json_file:
+                    existing_data = json.load(json_file)
+            except (FileNotFoundError, json.JSONDecodeError):
+                # If the file doesn't exist or is empty, initialize with an empty dictionary
+                existing_data = {}
+
+            data_to_append = {
+                description: {
+                    'Loss': float(eval_test.mean_loss)
+                }
+            }
+            if not config["auto_encoder"]:
+                data_to_append.update({
+                    description: {
+                        'Accuracy': float(eval_test.metrics[0]),
+                        'Sensitivity': float(eval_test.metrics[1]),
+                        'Specificity': float(eval_test.metrics[2]),
+                        'F1': float(eval_test.metrics[3]),
+                        'BACC': float(eval_test.metrics[4]),
+                        'MCC': float(eval_test.metrics[5]),
+                        'Prec.': float(eval_test.metrics[6])
+                    }
+                })
+
+            # Update the existing data with the new data
+            existing_data.update(data_to_append)
+
+            # Write the updated data to the JSON file
+            with open(file_log_test_results, 'w') as json_file:
+                json.dump(existing_data, json_file, indent=4)
+    
+    @staticmethod
+    def test_read(file_log_test_results, description, config):
+        try:
+            # Try to open the JSON file for reading (if it exists)
+            with open(file_log_test_results, 'r') as json_file:
+                existing_data = json.load(json_file)
+
+            # Check if the description key exists in the existing data
+            if description in existing_data:
+                data = existing_data[description]
+                
+                # Extract the loss value from the data
+                mean_loss = data.get('Loss')
+                
+                # Extract the metrics array from the data
+                metrics = []
+                if not config["auto_encoder"]:
+                    metrics = [
+                        data.get('Accuracy'),
+                        data.get('Sensitivity'),
+                        data.get('Specificity'),
+                        data.get('F1'),
+                        data.get('BACC'),
+                        data.get('MCC'),
+                        data.get('Prec.')
+                    ]
+
+        except (FileNotFoundError, json.JSONDecodeError):
+            print("JSON file not found or could not be decoded.")
+
+        return mean_loss, metrics
+
+    
