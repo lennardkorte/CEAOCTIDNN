@@ -49,6 +49,57 @@ class Eval():
                             image_in_pil.save(img_dir / f"{i}_input.png", "PNG")
                             image_out_pil.save(img_dir / f"{i}_output.png", "PNG")
 
+
+
+                            # Print absolute difference of input and output
+                            abs_diff = torch.abs(torch.subtract(image_slice_in, image_slice_out))
+                            abs_diff_norm = (255 * (abs_diff - abs_diff.min()) / (abs_diff.max() - abs_diff.min())).clamp(0, 255).byte()
+
+                            abs_diff_image = abs_diff_norm.cpu().numpy()
+                            # Save the image as a PNG file
+                            abs_diff_image_np = Image.fromarray(np.uint8(abs_diff_image), mode='L')
+                            abs_diff_image_np.save(img_dir / f"{i}_absdiff.png")
+
+                            segments = skimage.segmentation.slic(abs_diff_image, n_segments=15, compactness=0.02, channel_axis=None)
+
+                            segmentation_overlay = skimage.color.label2rgb(segments, image=abs_diff_image, kind='overlay')
+                            
+                            # Convert the numpy segmentation to a uint8 image
+                            segmentation_image = Image.fromarray(np.uint8(segmentation_overlay * 255))
+
+                            # Save the image as a PNG file
+                            segmentation_image.save(img_dir / f"{i}_segmentation.png")
+
+                            
+                            
+                            """
+                            # Print superpixel image
+                            transform = T.Compose([T.ToTensor(), ToSLIC(n_segments=75, add_seg=True, add_img=True)])
+                            data = transform(abs_diff_pil)
+                            
+                            # TODO remove two lines
+                            # segmented_image_pil = to_pil(data.seg[0])
+                            # segmented_image_pil.save(img_dir / f"{i}_diff.png", "PNG")
+
+                            # Access the superpixel representation and other attributes
+                            superpixel_data = data.x  # Contains the mean color of superpixels
+                            superpixel_positions = data.pos  # Contains the centroids of superpixels # unused
+                            segmentation_result = data.seg.astype(np.uint8)  # Contains the segmentation result
+
+                            print(superpixel_data.shape)
+                            
+                            # Convert the superpixel data to a PIL image and save it
+                            superpixel_image = to_pil(superpixel_data)  # Convert to grayscale
+                            superpixel_image.save(img_dir / f"{i}_superpixel.png", "PNG")
+
+                            # Convert the segmentation result to a PIL image and save it
+                            segmented_image = to_pil(segmentation_result)  # Convert to grayscale
+                            segmented_image.save(img_dir / f"{i}_segmented.png", "PNG")
+
+                            exit()
+                            """
+                            
+
                     else:
                         loss = loss_function(outputs, labels)
             
