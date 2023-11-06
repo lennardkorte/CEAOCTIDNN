@@ -55,7 +55,7 @@ class Wandb():
             wandb.log(dict)
     
     @staticmethod
-    def wandb_train_one_epoch(loss, optimizer, config):
+    def wandb_train_one_epoch(loss_avg, learning_rate_avg, config):
         if config['enable_wandb']:  
-            wandb.log({'Loss Training': loss})
-            wandb.log({'Learning Rate': optimizer.param_groups[0]['lr']})
+            wandb.log({'Loss Training': loss_avg})
+            wandb.log({'Learning Rate': learning_rate_avg})

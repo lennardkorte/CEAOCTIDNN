@@ -48,7 +48,7 @@ class Checkpoint():
         
         self.model = self.get_new_model(device, config)
         self.scaler = torch.cuda.amp.GradScaler()
-        self.optimizer = self.get_new_optimizer(self.model, config['learning_rate'], config['optimizer'])
+        self.optimizer = self.get_new_optimizer(self.model, config)
         self.start_epoch = 1
         if config["enable_wandb"]:
             self.wandb_id = Wandb.get_id()
@@ -140,24 +140,22 @@ class Checkpoint():
         return model
     
     @staticmethod    
-    def get_new_optimizer(model:DataParallel, learning_rate:float, name:str) -> None:
+    def get_new_optimizer(model:DataParallel, config:dict) -> None:
         ''' Gets the right optimizer specified in the configurations.
         
         Arguments:
             model: The model which is created and trained.
-            learning_rate: The speed in which the model learns and the gradient step size.
-            name: Name of the optimizer which was specified in the configurations.
+            config: Config File defining optimizer settings.
         Return:
-            This Method has nothing to return.
+            This Method has nothing to return. # TODO: this is wrong
         '''
         
-        if name == 'AdamW':
-            return optim.AdamW(model.parameters(), lr=learning_rate)
-        elif name == 'SGD':
-            return optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9) # TODO: Momentum needed?
+        if config['optimizer'] == 'AdamW':
+            return optim.AdamW(model.parameters(), lr=config['learning_rate'])
+        elif config['optimizer'] == 'SGD':
+            return optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=config['momentum'])
         else:
-            #return optim.Adam(model.parameters(), lr=learning_rate)
-            return optim.Adam(model.parameters(), lr=learning_rate) # TODO:, weight_decay=1e-2)
+            return optim.Adam(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'])
 
     @staticmethod
     def delete_checkpoint(name, epoch, save_path:Path) -> None:

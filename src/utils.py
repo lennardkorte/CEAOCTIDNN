@@ -74,8 +74,12 @@ class Utils():
         start_it_epoch = time.time()
         model.train()
         print('')
+
+        learning_rate_sum = 0
+        loss_sum = 0
+
         for j, (inputs, labels) in enumerate(Dataloaders.trainInd):
-            print('Current training batch: ', j, end='\r')
+            print('Current training batch: ', j + 1, end='\r')
             
             inputs = inputs.to(device)
             labels = labels.squeeze().type(torch.LongTensor).to(device)
@@ -88,8 +92,11 @@ class Utils():
                     outputs = model(inputs)
 
                     if config["auto_encoder"]:
-                        first_channel = inputs[:,:1,:,:]
-                        input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        
+                        # TODO
+                        input_scaled = inputs
+                        # first_channel = inputs[:,:1,:,:]
+                        # input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
                         
                         loss = loss_function(outputs, input_scaled)
                     else:
@@ -98,11 +105,14 @@ class Utils():
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-                
-            if config["enable_wandb"]:
-                Wandb.wandb_train_one_epoch(loss, optimizer, config)
 
+                learning_rate_sum += optimizer.param_groups[0]['lr']
+                loss_sum += loss
+                
             sys.stdout.write("\033[K")
+
+        if config["enable_wandb"]:
+            Wandb.wandb_train_one_epoch(loss / (j + 1), learning_rate_sum / (j + 1), config)
         
         return time.time() - start_it_epoch
 

@@ -7,6 +7,8 @@ import os
 import torch.nn.functional as F
 from PIL import Image
 from torchvision.transforms import ToPILImage
+import torchvision.transforms as T
+import skimage.segmentation
 
 from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 
@@ -25,8 +27,12 @@ class Eval():
                     
                     if config["auto_encoder"]:
                         # Rescale input image to compare it with output image
-                        first_channel = inputs[:,:1,:,:]
-                        input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        
+                        # TODO
+                        input_scaled = inputs
+                        #first_channel = inputs[:,:1,:,:]
+                        #input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        
                         loss = loss_function(outputs, input_scaled)
                         
                         if True: # TODO
@@ -69,7 +75,7 @@ class Eval():
 
                             # Save the image as a PNG file
                             segmentation_image.save(img_dir / f"{i}_segmentation.png")
-
+                            
                     else:
                         loss = loss_function(outputs, labels)
             

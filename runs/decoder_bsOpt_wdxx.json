@@ -1,8 +1,7 @@
-
 {
     "group": "decoder",
     "name": "run_1",
-    "overwrite_run": false,
+    "overwrite_run": true,
     "model_type": "ResNet18AutEnc",
     "loss_function": "MSELoss",
     "auto_encoder": true,

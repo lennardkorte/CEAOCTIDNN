@@ -1,6 +1,7 @@
 import os
 import copy
 import time
+import json
 import torch
 import GPUtil
 import argparse
@@ -33,6 +34,9 @@ def train_and_eval(config:Config):
     
     loss_function = Utils.get_new_lossfunction(cust_data.class_weights, device, config['loss_function'])
 
+    test_mean_loss_sum = 0.0
+    test_metrics_avg = [0.0] * 10
+
     for cv in range(config['num_cv']):
 
         early_stop = False
@@ -46,6 +50,7 @@ def train_and_eval(config:Config):
         Logger.print_section_line()
         
         cv_done, save_path_cv = Utils.check_cv_status(cv, config.save_path)
+
         if cv_done:
             print('Skipped CV number:', cv+1, '(already trained)')
         else:
@@ -70,7 +75,7 @@ def train_and_eval(config:Config):
                 
                 if config["enable_wandb"]:
                     Wandb.init(cv, checkpoint.wandb_id, config)
-                
+
                 start_time = time.time()
                 
                 Logger.print_section_line()
@@ -177,47 +182,39 @@ def train_and_eval(config:Config):
             Checkpoint.finalize_latest_checkpoint(checkpoint_num, save_path_cv)
         
         Logger.print_section_line()
+
         file_log_test_results = save_path_cv / FILE_NAME_TEST_RESULTS
-        if not os.path.isfile(file_log_test_results):
-            with Logger(file_log_test_results, 'a'):
-                print('Testing performance with testset on...')
-                test_model('test LAST model in CV ' + str(cv+1), 'checkpoint_last', cust_data.label_classes, save_path_cv, loss_function, config)
-                test_model('test BEST model in CV ' + str(cv+1), 'checkpoint_best', cust_data.label_classes, save_path_cv, loss_function, config)
-            
-                Logger.print_section_line()
-                if cv == config['num_cv'] - 1:
-                    print('Testing done.')
-                else:
-                    print('Next Fold...')
-                    
-        else:
-            print('Tests already logged in file:', file_log_test_results)
+        
+        print('Testing performance with testset on:')
+        for save_name in ['checkpoint_last', 'checkpoint_best']:
+            checkpoint = Checkpoint(save_name, save_path_cv, device, config)
+            if config["enable_wandb"] and 'WANDB_API_KEY' not in os.environ:
+                Wandb.init(cv, checkpoint.wandb_id, config)
+            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv)
+            Logger.printer(save_name, config, eval_test)
+            if config["enable_wandb"]:
+                Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, save_name, config)
+            Logger.log_test(file_log_test_results, save_name, config, eval_test)
+
+        save_path_cv = config.save_path / ('cv_' + str(cv + 1))
+        #checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config) # TODO: remove
+        test_mean_loss, test_metrics = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, 'checkpoint_best', config)
+        if not config["auto_encoder"]: metrics_avg = [sum(x) for x in zip(metrics_avg, test_metrics)]
+        test_mean_loss_sum += test_mean_loss
     
     Logger.print_section_line()
-    file_log_test_results_average_best = config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE_BEST
-    if not os.path.isfile(file_log_test_results_average_best):
-        with Logger(file_log_test_results_average_best, 'a'):
-            mean_loss_sum = 0.0
-            metrics_avg = [0.0] * 10
-            
-            for cv in range(config['num_cv']):
-                checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config)
-                if not config["auto_encoder"]: metrics_avg = [sum(x) for x in zip(metrics_avg, checkpoint.eval_valid_best.metrics)]
-                mean_loss_sum += checkpoint.eval_valid.mean_loss
-            
+        
+    if not config["auto_encoder"]: metrics_avg = [m / config['num_cv'] for m in metrics_avg]
+    test_mean_loss_avg = test_mean_loss_sum / config['num_cv']
+    
+    test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg})()
+    Logger.printer('Testing Metrics Average Best:', config, test_eval_avg)
 
-            if not config["auto_encoder"]: metrics_avg = [m / config['num_cv'] for m in metrics_avg]
-            mean_loss_avg = mean_loss_sum / config['num_cv']
-            
-            valid_avg = type('obj', (object,), {'mean_loss': mean_loss_avg, 'metrics': metrics_avg})()
-            Logger.printer('Testing Metrics Average Best:', config, valid_avg)
-            
-            if config["enable_wandb"]:
-                Wandb.init(-1, checkpoint.wandb_id, config)
-                Wandb.wandb_log(valid_avg, None, 0, None, 'Average Best', config)
-            
-    else:
-        print('Averages already logged in file:', file_log_test_results_average_best)
+    Logger.log_test(config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE_BEST, 'checkpoint_best', config, test_eval_avg)
+    
+    if config["enable_wandb"]:
+        Wandb.init(-1, checkpoint.wandb_id, config)
+        Wandb.wandb_log(test_eval_avg, None, 0, None, 'Average Best', config)
         
     print('')
         
@@ -234,10 +231,14 @@ if __name__ == '__main__':
     CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
     options = [
         CustomArgs(['--lr', '--learning_rate'], type=float, target='learning_rate'),
+        CustomArgs(['--wd', '--weight_decay'], type=float, target='weight_decay'),
+        CustomArgs(['--mo', '--momentum'], type=float, target='momentum'),
         CustomArgs(['--nm', '--name'], type=str, target='name'),
         CustomArgs(['--gr', '--group'], type=str, target='group'),
         
         # Add more arguments here
+
+        # TODO: why different kinds of args?
     ]
     
     config = Config(args, options)
