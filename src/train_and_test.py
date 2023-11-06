@@ -18,19 +18,9 @@ from data_loaders import Dataloaders
 from create_samples import create_samples
 from dataset_preparation import DatasetPreparation
 
-FILE_NAME_TEST_RESULTS = 'test_results.log'
+FILE_NAME_TEST_RESULTS = 'test_results.json'
 FILE_NAME_TRAINING = 'training.log'
-FILE_NAME_TEST_RESULTS_AVERAGE_BEST = 'test_results_average_best.log'
-
-def test_model(description, save_name, class_labels, save_path_cv:Path, loss_function, config) -> None:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    checkpoint = Checkpoint(save_name, save_path_cv, device, config)
-    if checkpoint is not None:
-        eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv)
-        Logger.printer(description, config, eval_test)
-
-        if config["enable_wandb"] and config['send_final_results']:
-                Wandb.wandb_log(eval_test, class_labels, 0, checkpoint.optimizer, save_name, config)
+FILE_NAME_TEST_RESULTS_AVERAGE_BEST = 'test_results_average_best.json'
 
 def train_and_eval(config:Config):
 
