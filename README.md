@@ -300,7 +300,6 @@ Configurations are copied and stored in the `name/` directory after starting the
     
     // Wandb
     "enable_wandb": false,
-    "send_final_results": true,
     "b_logging_active": false,
 
     // Logging
