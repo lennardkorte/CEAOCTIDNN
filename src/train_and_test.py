@@ -174,12 +174,12 @@ def train_and_eval(config:Config):
                         Logger.printer('Testing Metrics (tests on testing set):', config, eval_test)
                         
                     
-            if epoch == config['epochs']:
-                checkpoint_num = epoch
-            else:
-                checkpoint_num = epoch - 1
-                
-            Checkpoint.finalize_latest_checkpoint(checkpoint_num, save_path_cv)
+                if epoch == config['epochs']: # TODO: fix error occurring when setting cv num to 1
+                    checkpoint_num = epoch
+                else:
+                    checkpoint_num = epoch - 1
+                    
+                Checkpoint.finalize_latest_checkpoint(checkpoint_num, save_path_cv)
         
         Logger.print_section_line()
 
