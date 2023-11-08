@@ -13,5 +13,9 @@
     "num_cv": 1,                        
     "epochs": 300,
     "wb_project": "CEIMPA",
-    "batch_size": 16
+    "batch_size": 16,
+    "enable_wandb": false,
+    "data_augmentation": "4",
+    "overwrite_configurations": true,
+    "show_samples": true
 }

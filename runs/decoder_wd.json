@@ -8,9 +8,11 @@
     "encoder_group": "classifier",
     "encoder_name": "run_0",
     "early_stop_patience": 20,
-    "learning_rate": 1e-3,
+    "learning_rate": 8e-4,
     "num_cv": 1,                        
     "epochs": 300,
     "wb_project": "CEIMPA",
-    "batch_size": 32
+    "batch_size": 16,
+    "overwrite_configurations": true,
+    "show_samples": true
 }
