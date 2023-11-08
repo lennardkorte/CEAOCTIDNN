@@ -828,21 +828,23 @@ class DataAugmentationTechniques():
             T.CenterCrop(size=200),
             T.RandomCrop(size=image.shape, padding=10, fill=0, padding_mode='constant'), # edge, reflect or symmetric
             
+
+            # Positioning
+            # -------------------------------------------
+            # The following destroys determinism due to different worker seeds
+            T.RandomRotation(degrees=(-180,180), fill=0, interpolation=InterpolationMode.BILINEAR), # try center parameter random, interpolationmode has no effect on b/w image
+            T.RandomPerspective(distortion_scale=0.3, p=1.0, fill=0),
+            T.RandomHorizontalFlip(p=0.5),
+            T.RandomVerticalFlip(p=0.5),
+
             # Resizing, stretching, squeezing, repositioning
             #  :Randomize
             #T.Resize(size=(200,200)),
             # random crop, random aspect ratio, resize
-            T.RandomResizedCrop(size=image.shape, scale=(0.5, 1.0), ratio=(1.0, 1.0)), # also used in Inception networks
+            T.RandomResizedCrop(size=image.shape, scale=(0.8, 1.0), ratio=(1.0, 1.0), antialias=True), # also used in Inception networks
             # random rotation, random scale, repositioning
-            T.RandomAffine(degrees=(-20,20), translate=(0.1, 0.1), scale=(1.0, 1.2), fill=0), 
+            T.RandomAffine(degrees=(-180,180), translate=(0, 0), scale=(0.8, 1.2), fill=0, interpolation=InterpolationMode.BILINEAR), 
             
-            # Positioning
-            # -------------------------------------------
-            # The following destroys determinism due to different worker seeds
-            T.RandomPerspective(distortion_scale=0.5, p=0.5, fill=1),
-            T.RandomHorizontalFlip(p=0.5),
-            T.RandomVerticalFlip(p=0.5),
-            T.RandomRotation(degrees=(-180,180), fill=0, interpolation=InterpolationMode.BILINEAR), # try center parameter random, interpolationmode has no effect on b/w image
             
             # Grayscaling
             # -------------------------------------------
@@ -885,7 +887,7 @@ class DataAugmentationTechniques():
             # preprocessing
             #GuideWireRemoval(),
             
-            RandomShiftHor(max_amount=173),
+            #RandomShiftHor(max_amount=173),
             #RandomShiftVert(max_amount=341),
             
             #VerticalFlip(),
@@ -919,13 +921,13 @@ class DataAugmentationTechniques():
             #MeanNormalization(),
             #Standardization_zero(),
             #Standardization_zero_five(),
-            Rescaling(), # note: if removed, remove also scaling in create_samples
+            Rescaling(), # note: if rescaling is removed, set a scaling factor in create_samples for better visibility
             
         ]
         post_transforms = [
             T.Resize(size=output_shape, antialias=True),
-            AddDoubleZeroPadding(),
-            #ThreeChannelCopy(),
+            #AddDoubleZeroPadding(),
+            ThreeChannelCopy(),
             #Standardization_IN(),
             
         ]
