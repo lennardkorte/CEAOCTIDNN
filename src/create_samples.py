@@ -15,8 +15,8 @@ def tensor_to_numpy(image_tensor) -> np.ndarray:
     # Convert back to Numpy
     image_np = image_tensor.cpu().detach().numpy()
     image_np = image_np[:1].squeeze()
-    image_np = image_np * 30
-    image_np = image_np * 65535.0 # comment out if rescaling is active in preprocessing
+    #image_np = image_np * 5
+    image_np = image_np * 65535.0 # here because rescaling is active in preprocessing -> scales to a value between 0 and 1
     image_np = image_np.astype(np.uint16)
     return image_np
     
