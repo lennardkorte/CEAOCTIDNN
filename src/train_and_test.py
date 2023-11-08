@@ -225,23 +225,16 @@ if __name__ == '__main__':
     args.add_argument('-wb', '--wandb', default=None, type=str, help='Wandb API key (default: None)')
     args.add_argument('-ntt', '--no_trainandtest', dest='trainandtest', action='store_false', help='Deactivation of Training and Testing (default: Activated)')
     args.add_argument('-smp', '--show_samples', dest='show_samples', action='store_true', help='Activate creation of Sample from Data Augmentation (default: Deactivated)')
-    args.add_argument('-ycf', '--overwrite_configurations', dest='overwrite_configurations', action='store_false', help='Overwrite Configurations, if config file in this directory already exists. (default: False)')
+    args.add_argument('-ycf', '--overwrite_configurations', dest='overwrite_configurations', action='store_true', help='Overwrite Configurations, if config file in this directory already exists. (default: False)')
     args.add_argument('-da', '--data_augmentation', default=None, type=str, help='indices of Data Augmentation techniques to enable (default: None)')
+    args.add_argument('-lr', '--learning_rate', default=3e-6, type=float, help='')
+    args.add_argument('-wd', '--weight_decay', default=0.001, type=float, help='')
+    args.add_argument('-mo', '--momentum', default=0.9, type=float, help='')
+    args.add_argument('-bs', '--batch_size', default=128, type=int, help='')
+    args.add_argument('-nm', '--name', default='run_0', type=str, help='')
+    args.add_argument('-gr', '--group', default='group_0', type=str, help='')
     
-    CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')
-    options = [
-        CustomArgs(['--lr', '--learning_rate'], type=float, target='learning_rate'),
-        CustomArgs(['--wd', '--weight_decay'], type=float, target='weight_decay'),
-        CustomArgs(['--mo', '--momentum'], type=float, target='momentum'),
-        CustomArgs(['--nm', '--name'], type=str, target='name'),
-        CustomArgs(['--gr', '--group'], type=str, target='group'),
-        
-        # Add more arguments here
-
-        # TODO: why different kinds of args?
-    ]
-    
-    config = Config(args, options)
+    config = Config(args)
     
     if config['show_samples']:
         create_samples(config)

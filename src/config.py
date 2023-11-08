@@ -19,7 +19,7 @@ class Config(dict):
     It reads the arguments and configuration files to determine the configuration.
     '''
     
-    def __init__(self, args:ArgumentParser, options:list):
+    def __init__(self, args:ArgumentParser):
         ''' Initialized the config object with the right configuration.
         - First adds the configurations from the standard configuration file.
         - Secondly overwrites all given configurations with the config file provided in an argument.
@@ -28,43 +28,41 @@ class Config(dict):
         Arguments:
             self: The "Config" object itself.
             args: Standard arguments like config-file directory which are essential for running the program.
-            options: Custom arguments to add and evaluate.
         Return:
             The class constructor returns a "Config" object.
         '''
         
-        # Reads all given arguments and adds them to the args variable.
-        for opt in options:
-            args.add_argument(*opt.flags, default=None, type=opt.type)
         if not isinstance(args, tuple):
             args = args.parse_args()
-        
         # Reads the standard configuration file to create the dict foundation.
         config = Utils.read_json('./src/' + NAME_CONFIG_FILE_STANDARD)
+        
+
+        
         # Adds / overwrites the given config to the new config.
         if args.config is not None:
             config.update(Utils.read_json(args.config))
+
+
+        if config['trainandtest']: config.update({'trainandtest':args.trainandtest})
+        if not config['overwrite_configurations']: config.update({'overwrite_configurations':args.overwrite_configurations})
+        if not config['show_samples']: config.update({'show_samples':args.show_samples})
             
         # Sets / Overwrites the given config with the newly chosen Data Augmentation techniques
+        config['transformations_chosen'] = []
         if args.data_augmentation is not None:
-            config['transformations_chosen'] = [int(x) for x in args.data_augmentation.split(',')]
-        else:
-            config['transformations_chosen'] = []
-            
+            config['transformations_chosen'] += [int(x) for x in args.data_augmentation.split(',')]
+        if config['data_augmentation'] != "":
+            config['transformations_chosen'] += [int(x) for x in config['data_augmentation'].split(',')]
+        
         # Given arguments overwrite all other configs.
         config.update({
             'wandb':args.wandb,
-            'trainandtest':args.trainandtest,
-            'show_samples':args.show_samples,
-            'overwrite_configurations': args.overwrite_configurations,
             'gpus':args.gpus
             })
-
-        # Adds random other arguments to the config file.
-        modification = {opt.target : getattr(args, self._get_opt_name(opt.flags)) for opt in options}
-        self.config = self._update_config(config, modification)
-
         
+        self.config = config
+
         self.save_path = Path('./data/train_and_test', config['group'], config['name'])
         # Detele previous run
         if config['overwrite_run']: shutil.rmtree(self.save_path, ignore_errors=True)
@@ -75,7 +73,7 @@ class Config(dict):
         # Warns user with a dialogue when config changed, in case a program tries to continue.
         config_file_copy_path = self.save_path / 'config.json'
         if os.path.isfile(config_file_copy_path) and not Utils.read_json(config_file_copy_path) == config:
-            if config['overwrite_configurations']:
+            if not config['overwrite_configurations']:
                 print('This model has been trained with a different config before. Sure that you want to run this with a changed configuration file? Run with different name is recommended.')
                 print('"yes" or "no" ?')
                 while(True):
