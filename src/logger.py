@@ -32,15 +32,15 @@ class Logger(object):
     @staticmethod
     def printer(title, config, eval_test):
         print('\n' + title)
-        print("   Loss:        ", round(eval_test.mean_loss, config['early_stop_accuracy']))
+        print("   Loss:          ", round(eval_test.mean_loss, config['early_stop_accuracy']))
         if not config["auto_encoder"]:
-            print("   Accuracy:    ", round(eval_test.metrics[0], config['early_stop_accuracy']))
-            print("   Sensitivity: ", round(eval_test.metrics[1], config['early_stop_accuracy']))
-            print("   Specificity: ", round(eval_test.metrics[2], config['early_stop_accuracy']))
-            print("   F1:          ", round(eval_test.metrics[4], config['early_stop_accuracy']))
-            print("   BACC:        ", round(eval_test.metrics[7], config['early_stop_accuracy']))
-            print("   MCC:         ", round(eval_test.metrics[8], config['early_stop_accuracy']))
-            print("   Prec.:       ", round(eval_test.metrics[9], config['early_stop_accuracy']))
+            print("   Accuracy:      ", round(eval_test.metrics[0], config['early_stop_accuracy']))
+            print("   Sensitivity:   ", round(eval_test.metrics[1], config['early_stop_accuracy']))
+            print("   Specificity:   ", round(eval_test.metrics[2], config['early_stop_accuracy']))
+            print("   F1:            ", round(eval_test.metrics[3], config['early_stop_accuracy']))
+            print("   BACC:          ", round(eval_test.metrics[4], config['early_stop_accuracy']))
+            print("   MCC:           ", round(eval_test.metrics[5], config['early_stop_accuracy']))
+            print("   Prec.:         ", round(eval_test.metrics[6], config['early_stop_accuracy']))
 
     def printer_ae(title, early_stop_accuracy, mean_loss):
         print('\n' + title)
@@ -62,16 +62,14 @@ class Logger(object):
                 }
             }
             if not config["auto_encoder"]:
-                data_to_append.update({
-                    description: {
-                        'Accuracy': float(eval_test.metrics[0]),
-                        'Sensitivity': float(eval_test.metrics[1]),
-                        'Specificity': float(eval_test.metrics[2]),
-                        'F1': float(eval_test.metrics[3]),
-                        'BACC': float(eval_test.metrics[4]),
-                        'MCC': float(eval_test.metrics[5]),
-                        'Prec.': float(eval_test.metrics[6])
-                    }
+                data_to_append[description].update({
+                    'Accuracy': float(eval_test.metrics[0]),
+                    'Sensitivity': float(eval_test.metrics[1]),
+                    'Specificity': float(eval_test.metrics[2]),
+                    'F1': float(eval_test.metrics[3]),
+                    'BACC': float(eval_test.metrics[4]),
+                    'MCC': float(eval_test.metrics[5]),
+                    'Prec.': float(eval_test.metrics[6])
                 })
 
             # Update the existing data with the new data
@@ -88,29 +86,29 @@ class Logger(object):
             with open(file_log_test_results, 'r') as json_file:
                 existing_data = json.load(json_file)
 
-            # Check if the description key exists in the existing data
-            if description in existing_data:
-                data = existing_data[description]
-                
-                # Extract the loss value from the data
-                mean_loss = data.get('Loss')
-                
-                # Extract the metrics array from the data
-                metrics = []
-                if not config["auto_encoder"]:
-                    metrics = [
-                        data.get('Accuracy'),
-                        data.get('Sensitivity'),
-                        data.get('Specificity'),
-                        data.get('F1'),
-                        data.get('BACC'),
-                        data.get('MCC'),
-                        data.get('Prec.')
-                    ]
+            data = existing_data[description]
+            
+            # Extract the loss value from the data
+            mean_loss = data.get('Loss')
+            
+            # Extract the metrics array from the data
+            metrics = []
+            if not config["auto_encoder"]:
+                metrics = [
+                    float(data.get('Accuracy')),
+                    float(data.get('Sensitivity')),
+                    float(data.get('Specificity')),
+                    float(data.get('F1')),
+                    float(data.get('BACC')),
+                    float(data.get('MCC')),
+                    float(data.get('Prec.'))
+                ]
+            
+            return mean_loss, metrics
 
         except (FileNotFoundError, json.JSONDecodeError):
             print("JSON file not found or could not be decoded.")
 
-        return mean_loss, metrics
+        
 
     

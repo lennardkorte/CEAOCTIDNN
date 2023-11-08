@@ -35,7 +35,7 @@ def train_and_eval(config:Config):
     loss_function = Utils.get_new_lossfunction(cust_data.class_weights, device, config['loss_function'])
 
     test_mean_loss_sum = 0.0
-    test_metrics_avg = [0.0] * 10
+    test_metrics_sum = [0.0] * 10
 
     for cv in range(config['num_cv']):
 
@@ -108,10 +108,10 @@ def train_and_eval(config:Config):
                     if config["auto_encoder"]:
                         improvement_identified = round(checkpoint.eval_valid.mean_loss, config['early_stop_accuracy']) < round(validation_best_mean_loss_current_cv, config['early_stop_accuracy'])
                     else:
-                        improvement_identified = round(checkpoint.eval_valid.metrics[8], config['early_stop_accuracy']) > round(validation_best_metrics_current_cv[8], config['early_stop_accuracy'])
+                        improvement_identified = round(checkpoint.eval_valid.metrics[5], config['early_stop_accuracy']) > round(validation_best_metrics_current_cv[5], config['early_stop_accuracy'])
                     
                     if config['calc_train_error'] and not config["auto_encoder"]:
-                        no_overfitting = round(checkpoint.eval_valid.metrics[8], config['early_stop_accuracy']) <= round(eval_train.metrics[8], config['early_stop_accuracy'])
+                        no_overfitting = round(checkpoint.eval_valid.metrics[5], config['early_stop_accuracy']) <= round(eval_train.metrics[5], config['early_stop_accuracy'])
                     else:
                         no_overfitting = True
                         
@@ -164,7 +164,7 @@ def train_and_eval(config:Config):
                     print(time.strftime('Current Time:   %d.%m. %H:%M:%S', time.localtime()))
                     print('Loss ValInd:   ', round(checkpoint.eval_valid.mean_loss, config['early_stop_accuracy']))
                     if not config["auto_encoder"]:
-                        print('Best MCC: ', round(validation_best_metrics_current_cv[8], config['early_stop_accuracy']), 'at Epoch', last_best_epoch_current_cv)
+                        print('Best MCC: ', round(validation_best_metrics_current_cv[5], config['early_stop_accuracy']), 'at Epoch', last_best_epoch_current_cv)
                     
                     Logger.printer('Validation Metrics (tests on validation set):', config, checkpoint.eval_valid)
                     if config['peak_train_error']:
@@ -199,12 +199,12 @@ def train_and_eval(config:Config):
         save_path_cv = config.save_path / ('cv_' + str(cv + 1))
         #checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config) # TODO: remove
         test_mean_loss, test_metrics = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, 'checkpoint_best', config)
-        if not config["auto_encoder"]: metrics_avg = [sum(x) for x in zip(metrics_avg, test_metrics)]
+        if not config["auto_encoder"]: test_metrics_sum = [sum(x) for x in zip(test_metrics_sum, test_metrics)]
         test_mean_loss_sum += test_mean_loss
     
     Logger.print_section_line()
         
-    if not config["auto_encoder"]: metrics_avg = [m / config['num_cv'] for m in metrics_avg]
+    if not config["auto_encoder"]: test_metrics_avg = [m / config['num_cv'] for m in test_metrics_sum]
     test_mean_loss_avg = test_mean_loss_sum / config['num_cv']
     
     test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg})()

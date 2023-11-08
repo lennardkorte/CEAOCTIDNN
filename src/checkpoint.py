@@ -86,7 +86,7 @@ class Checkpoint():
                 if eval_valid.mean_loss < self.eval_valid_best.mean_loss:
                     self.eval_valid_best = copy.deepcopy(eval_valid)
             else:
-                if eval_valid.metrics[8] > self.eval_valid_best.metrics[8]:
+                if eval_valid.metrics[5] > self.eval_valid_best.metrics[5]:
                     self.eval_valid_best = copy.deepcopy(eval_valid)
         
         self.eval_valid = eval_valid

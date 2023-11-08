@@ -101,7 +101,7 @@ class Eval():
     def calc_metrics(self, predictions, targets, targets_tensor, num_out):
         accuracy = np.mean(np.equal(np.argmax(predictions, 1), targets))
         conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1))
-        print("Confusion matrix:\n", conf_matrix)
+
         weighted_accuracy = conf_matrix.diagonal() / conf_matrix.sum(axis=1)
         sensitivity = np.zeros([num_out])
         specificity = np.zeros([num_out])
@@ -145,6 +145,11 @@ class Eval():
             fpr[i], tpr[i], _ = roc_curve(targets_one_hot[:, i], predictions[:, i])
             roc_auc[i] = auc(fpr[i], tpr[i])
 
-        return [accuracy, sensitivity, specificity, conf_matrix, f1, roc_auc, weighted_accuracy, bacc, mcc, prec]
+        self.confusion_matrix = conf_matrix # TODO: unused
+        self.roc_auc = roc_auc # TODO: unused
+        self.weighted_accuracy = weighted_accuracy # TODO: unused
+
+
+        return [accuracy, sensitivity, specificity, f1, bacc, mcc, prec]
     
     

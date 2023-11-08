@@ -40,10 +40,10 @@ class Wandb():
                     prefix + ' Accuracy': eval_test.metrics[0],
                     prefix + ' Sensitivity': eval_test.metrics[1],
                     prefix + ' Specificity': eval_test.metrics[2],
-                    prefix + ' F1': eval_test.metrics[4],
-                    prefix + ' BACC': eval_test.metrics[7],
-                    prefix + ' MCC': eval_test.metrics[8],
-                    prefix + ' PPV': eval_test.metrics[9],
+                    prefix + ' F1': eval_test.metrics[3],
+                    prefix + ' BACC': eval_test.metrics[4],
+                    prefix + ' MCC': eval_test.metrics[5],
+                    prefix + ' PPV': eval_test.metrics[6],
                 })
             
             if optimizer is not None:
