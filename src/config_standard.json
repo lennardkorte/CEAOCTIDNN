@@ -30,12 +30,14 @@
     "peak_train_error": false,
     "calc_and_peak_test_error": false,
     
+    "trainandtest": true,
     "num_cv": 7,                        
     "epochs": 50,                      
     "learning_rate": 3e-6,
     "early_stop_patience": 25,           
     "early_stop_accuracy": 7,          
-    "transformations_chosen": "",       
+    "data_augmentation": "6,7,9",
+    "show_samples": true,       
 
     "define_sets_manually": true,
     "c2_or_c3": "ivoct_both_c2/",       
