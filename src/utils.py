@@ -53,7 +53,7 @@ class Utils():
         
         cv_done = False
         for i in os.listdir(save_path_cv):
-            if os.path.isfile(os.path.join(save_path_cv,i)) and 'checkpoint_last' in i:
+            if os.path.isfile(os.path.join(save_path_cv,i)) and 'checkpoint_latest' in i:
                 cv_done = True
             
         return cv_done, save_path_cv
