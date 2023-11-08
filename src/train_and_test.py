@@ -83,7 +83,7 @@ def train_and_eval(config:Config):
                 early_stop = False
                 es_counter = 0
                 
-                for epoch in range(checkpoint.start_epoch, config['epochs'] + 1):
+                for epoch in range(checkpoint.start_epoch, config['epochs']):
                     if early_stop:
                         break
                     
