@@ -3,6 +3,8 @@
     "name": "run_0",
     "group": "group_0",
     "overwrite_run": false,
+    "overwrite_configurations": false,
+    "gpu": 0,
     
     "use_cuda": true,
     "deterministic_training": true,
