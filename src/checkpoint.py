@@ -172,18 +172,3 @@ class Checkpoint():
         if os.path.isfile(save_path / (name + '_at_epoch_' + str(epoch) + '.pt')):
             os.remove(save_path / (name + '_at_epoch_' + str(epoch) + '.pt'))
 
-    @staticmethod
-    def finalize_latest_checkpoint(epoch, save_path:Path) -> None:
-        ''' Changes the name of the last checkpoint in the CV to indicate a finished training.
-
-        Arguments:
-            epoch: The epoch as a part of the filename of the checkpoint to delete.
-            save_path: Directory where the checkpoint is stored.
-        Return:
-            The Method has nothing to return.
-        '''
-        
-        filename = 'checkpoint_latest' + '_at_epoch_' + str(epoch) + '.pt'
-        if os.path.isfile(save_path / filename):
-            os.rename(save_path / filename, save_path / filename.replace('latest', 'last'))
-

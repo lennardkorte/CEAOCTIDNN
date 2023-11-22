@@ -2,8 +2,6 @@
 import torch.nn as nn
 import torch
 from torchvision import models
-from efficientnet_pytorch import EfficientNet
-import pretrainedmodels
 from pathlib import Path
 from glob import glob
 import models_resnet_autenc
