@@ -1,5 +1,4 @@
 
-from pathlib import Path
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -7,7 +6,6 @@ import math
 import torch.nn as nn
 import cv2 as cv
 import os
-import torch.nn.functional as F
 from PIL import Image
 from torchvision.transforms import ToPILImage
 import torchvision.transforms as T
@@ -16,7 +14,7 @@ import skimage.segmentation
 from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 
 class Eval():
-    def __init__(self, dataloader, device, model, loss_function, config, save_path_cv):
+    def __init__(self, dataloader, device, model, loss_function, config, save_path_cv, if_val_or_test=False):
         model.eval()
 
         for i, (inputs, labels) in enumerate(dataloader):
@@ -36,48 +34,80 @@ class Eval():
                         #first_channel = inputs[:,:1,:,:]
                         #input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
                         
-                        loss = loss_function(outputs, input_scaled)
+                        loss_batch = loss_function(outputs, input_scaled)
                         
-                        if True: # TODO
-                            # Extract the slice (single channel image) from the tensor
-                            image_slice_in = input_scaled[0, 0, :, :]
-                            image_slice_out = outputs[0, 0, :, :]
+                        if if_val_or_test:
+                            # Compute MSE Loss for input and output image of autoencoder
+                            loss_function_mse = nn.MSELoss() # instantiation
 
-                            images_max = max(image_slice_in.max(), image_slice_out.max())
-                            images_min = min(image_slice_in.min(), image_slice_out.min())
-                            image_in = (255 * (image_slice_in - images_min) / (images_max - images_min)).clamp(0, 255).byte()
-                            image_out = (255 * (image_slice_out - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+                            mse_losses_mean_old = loss_function_mse(inputs, outputs)
 
-                            to_pil = ToPILImage()
-                            image_in_pil = to_pil(image_in)
-                            image_out_pil = to_pil(image_out)
-
-                            # Save the image as a PNG file
-                            img_dir = save_path_cv / "example_images/"
-                            os.makedirs(img_dir, exist_ok = True)
-                            image_in_pil.save(img_dir / f"{i}_input.png", "PNG")
-                            image_out_pil.save(img_dir / f"{i}_output.png", "PNG")
-
-
-
-                            # Print absolute difference of input and output
-                            abs_diff = torch.abs(torch.subtract(image_slice_in, image_slice_out))
-                            abs_diff_norm = (255 * (abs_diff - abs_diff.min()) / (abs_diff.max() - abs_diff.min())).clamp(0, 255).byte()
-
-                            abs_diff_image = abs_diff_norm.cpu().numpy()
-                            # Save the image as a PNG file
-                            abs_diff_image_np = Image.fromarray(np.uint8(abs_diff_image), mode='L')
-                            abs_diff_image_np.save(img_dir / f"{i}_absdiff.png")
-
-                            segments = skimage.segmentation.slic(abs_diff_image, n_segments=15, compactness=0.02, channel_axis=None)
-
-                            segmentation_overlay = skimage.color.label2rgb(segments, image=abs_diff_image, kind='overlay')
+                            mse_losses_batch = []
+                            for input, output in zip(inputs, outputs):
+                                mse_loss = loss_function_mse(input, output).cpu().numpy()
+                                mse_losses_batch.append(mse_loss)
+                            mse_losses_mean = np.mean(mse_losses_batch)
                             
-                            # Convert the numpy segmentation to a uint8 image
-                            segmentation_image = Image.fromarray(np.uint8(segmentation_overlay * 255))
 
-                            # Save the image as a PNG file
-                            segmentation_image.save(img_dir / f"{i}_segmentation.png")
+
+
+
+                            if not i % int(len(dataloader) / 10):
+                                # Extract the slice (single channel image) from the tensor
+                                image_slice_in = input_scaled[0, 0, :, :].clone()
+                                image_slice_out = outputs[0, 0, :, :].clone()
+                                # with blurring:
+                                #image_slice_in_blur = input_scaled[0, :1, :, :].clone().detach()
+                                #image_slice_in_blur = T.GaussianBlur(kernel_size=(5,5), sigma=(2,2))(image_slice_in_blur)
+                                #image_slice_in_blur = image_slice_in_blur[0, :, :]
+                                
+                                images_max = max(image_slice_in.max(), image_slice_out.max())
+                                images_min = min(image_slice_in.min(), image_slice_out.min())
+                                image_in = (255 * (image_slice_in - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+                                #image_in_blur = (255 * (image_slice_in_blur - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+                                image_out = (255 * (image_slice_out - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+
+                                to_pil = ToPILImage()
+                                image_in_pil = to_pil(image_in)
+                                #image_in_blur_pil = to_pil(image_in_blur)
+                                image_out_pil = to_pil(image_out)
+
+                                # Save the image as a PNG file
+                                img_dir = save_path_cv / "example_images/"
+                                os.makedirs(img_dir, exist_ok = True)
+                                image_in_pil.save(img_dir / f"{i}_input.png", "PNG")
+                                #image_in_blur_pil.save(img_dir / f"{i}_input_blur.png", "PNG")
+                                image_out_pil.save(img_dir / f"{i}_output.png", "PNG")
+
+                                # Print absolute difference of input and output
+                                abs_diff = torch.abs(torch.subtract(image_slice_in, image_slice_out))
+                                abs_diff = (255 * (abs_diff - images_min) / (images_max - images_min)).clamp(0, 255).byte()
+                                #Alternative min and max values when normalizing for range 0 to 255
+                                #abs_diff = (255 * (abs_diff - abs_diff.min()) / (abs_diff.max() - abs_diff.min())).clamp(0, 255).byte()
+
+                                abs_diff_image = abs_diff.cpu().numpy()
+
+                                '''
+                                kernel_size = 5  # Adjust this as needed
+                                abs_diff_image = cv.medianBlur(abs_diff_image, kernel_size)
+                                alpha = 2.0  # Contrast control (1.0-3.0)
+                                beta = 0     # Brightness control (0-100)
+                                abs_diff_image = cv.convertScaleAbs(abs_diff_image, alpha=alpha, beta=beta)
+                                #abs_diff_image_con[abs_diff_image_con > 35] = 0
+                                '''
+
+                                # Save the image as a PNG file
+                                abs_diff_image_np = Image.fromarray(np.uint8(abs_diff_image), mode='L')
+                                abs_diff_image_np.save(img_dir / f"{i}_absdiff.png")
+
+                                segments = skimage.segmentation.slic(abs_diff_image, n_segments=8, compactness=0.03, channel_axis=None)
+                                segmentation_overlay = skimage.color.label2rgb(segments, image=abs_diff_image, kind='overlay')
+                                
+                                # Convert the numpy segmentation to a uint8 image
+                                segmentation_image = Image.fromarray(np.uint8(segmentation_overlay * 255))
+
+                                # Save the image as a PNG file
+                                segmentation_image.save(img_dir / f"{i}_segmentation.png")
                             
                     else:
                         loss_batch = loss_function(outputs, labels)
