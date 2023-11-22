@@ -1,12 +1,12 @@
 
 {
-    "group": "classifier",
+    "group": "classifier_resnet18",
     "wb_project": "CEIMPA",
     "show_samples": true,
     "overwrite_run": false,
     "data_augmentation": "6,7,9",
     "overwrite_configurations": true,
     "enable_wandb": false,
-    "epochs": 4,
-    "num_cv": 1
+    "epochs": 200,
+    "num_cv": 7
 }

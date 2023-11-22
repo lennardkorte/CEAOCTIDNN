@@ -7,6 +7,6 @@ for (( b=16; b<=128; b=c*2 ))
 do
     for (( c=1; c<=1000; c=c*2 ))
     do  
-        bash $entrance_script -w $WANDB_API_KEY -cfg ./runs/decoder_bs$((b)).json --lr $((c))e-4 --nm "run_bs$((b))_$((c))e-4" --bs $((b))
+        bash $entrance_script -w $WANDB_API_KEY -cfg ./runs/decoder_resnet18_bs$((b)).json --lr $((c))e-4 --nm "run_bs$((b))_$((c))e-4" --bs $((b))
     done
 done

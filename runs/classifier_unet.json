@@ -1,0 +1,12 @@
+
+{
+    "group": "classifier_unet",
+    "wb_project": "CEIMPA",
+    "show_samples": true,
+    "overwrite_run": true,
+    "data_augmentation": "6,7,9",
+    "overwrite_configurations": true,
+    "enable_wandb": true,
+    "epochs": 200,
+    "num_cv": 7
+}
