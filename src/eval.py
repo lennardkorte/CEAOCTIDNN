@@ -2,7 +2,10 @@
 from pathlib import Path
 import torch
 import numpy as np
+import torch.nn.functional as F
 import math
+import torch.nn as nn
+import cv2 as cv
 import os
 import torch.nn.functional as F
 from PIL import Image
@@ -15,7 +18,7 @@ from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 class Eval():
     def __init__(self, dataloader, device, model, loss_function, config, save_path_cv):
         model.eval()
-        
+
         for i, (inputs, labels) in enumerate(dataloader):
             inputs = inputs.to(device)
             labels = labels.squeeze().type(torch.LongTensor).to(device)
@@ -77,15 +80,15 @@ class Eval():
                             segmentation_image.save(img_dir / f"{i}_segmentation.png")
                             
                     else:
-                        loss = loss_function(outputs, labels)
+                        loss_batch = loss_function(outputs, labels)
             
             if i == 0:
-                loss_all_tensor = loss.unsqueeze(0)
+                loss_all_tensor = loss_batch.unsqueeze(0)
                 if not config["auto_encoder"]:
                     predictions_tensor = outputs
                     targets_tensor = labels
             else:
-                loss_all_tensor = torch.cat([loss_all_tensor, loss.unsqueeze(0)], 0)  # input (t*batch, cxbxwxh)
+                loss_all_tensor = torch.cat([loss_all_tensor, loss_batch.unsqueeze(0)], 0)  # input (t*batch, cxbxwxh)
                 if not config["auto_encoder"]:
                     predictions_tensor = torch.cat([predictions_tensor, outputs], 0)
                     targets_tensor = torch.cat([targets_tensor, labels], 0)
