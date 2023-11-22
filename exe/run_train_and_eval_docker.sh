@@ -6,18 +6,21 @@ reset=`tput sgr0`
 date=$(date '+%Yy-%mm-%dd_%Hh-%Mm-%Ss')
 name_image="image-${date}"
 name_container="container-${date}"
-filename="train_and_test.py"
-data_path="/docker_data/data"
 
 echo -e "${green}\n\nBuilding docker-image...${reset}"
 docker build -t $name_image .
 
 echo -e "${green}\n\nRemoving additional <none> images...${reset}"
-docker rm $(docker ps -a -q) > /dev/null 2>&1
+#docker rm $(docker ps -a -q) > /dev/null 2>&1
 docker image prune -f
 
 echo -e "${green}\n\nShow all images:${reset}"
 docker image ls
+
+# Run Container
+
+data_path="/docker_data/data"
+filename="train_and_test.py"
 
 echo -e "${green}\n\nRun docker-image:${reset}"
 args="$@"
