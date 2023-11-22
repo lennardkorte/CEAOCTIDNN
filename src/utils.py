@@ -42,21 +42,20 @@ class Utils():
             if config['deterministic_batching']:
                 np.random.seed(seed)
                 random.seed(seed)
-                
-        return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    @staticmethod
-    def check_cv_status(cv, save_path:Path):
-        # check if Crossfold is already partly trained
-        save_path_cv = save_path / ('cv_' + str(cv + 1))
-        os.makedirs(save_path_cv, exist_ok=True)
         
-        cv_done = False
-        for i in os.listdir(save_path_cv):
-            if os.path.isfile(os.path.join(save_path_cv,i)) and 'checkpoint_latest' in i:
-                cv_done = True
-            
-        return cv_done, save_path_cv
+        try:
+            # Check if GPU is available
+            assert torch.cuda.is_available(), "No GPU available"
+            if config['gpu'] == 1:
+                assert 2 > torch.cuda.device_count(), "Chosen GPU not available"
+            print("Chosen GPU is available")
+
+        except AssertionError as error:
+            # Handle the assertion error if no GPU is available
+            print(f"Assertion Error: {error}")
+            raise SystemExit("Program terminated due to lack of GPU.")
+
+        return torch.device(config['gpu'])
     
     @staticmethod
     def get_new_lossfunction(class_weights, device, loss_function):
@@ -78,8 +77,10 @@ class Utils():
         learning_rate_sum = 0
         loss_sum = 0
 
+        num_batches = len(Dataloaders.trainInd)
+        print('Training {num_batches} batches.')
+
         for j, (inputs, labels) in enumerate(Dataloaders.trainInd):
-            print('Current training batch: ', j + 1, end='\r')
             
             inputs = inputs.to(device)
             labels = labels.squeeze().type(torch.LongTensor).to(device)
