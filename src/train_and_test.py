@@ -31,6 +31,7 @@ def train_and_eval(config:Config):
 
     test_mean_loss_sum = 0.0
     test_metrics_sum = [0.0] * 10
+    mse_loss_conf_matr_mean_sum = np.array([[0.0, 0.0],[0.0, 0.0]])
 
     for cv in range(config['num_cv']):
 
@@ -137,7 +138,8 @@ def train_and_eval(config:Config):
                         es_counter += 1
                         
                     print('improvement_identified:', improvement_identified)
-                    print('no_overfitting:', no_overfitting)
+                    if not config["auto_encoder"]:
+                        print('no_overfitting:', no_overfitting)
 
                     if config['early_stop_patience']:
                         if es_counter >= config['early_stop_patience']:
@@ -179,27 +181,29 @@ def train_and_eval(config:Config):
             if config["enable_wandb"] and 'WANDB_API_KEY' not in os.environ:
                 Wandb.init(cv, checkpoint.wandb_id, config)
                 
-            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, if_val_or_test=True if 'checkpoint_best' == checkpoint_name else False)
-            Logger.printer(checkpoint_name, config, eval_test)
+            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, if_val_or_test=True)
+            Logger.printer(checkpoint_name, config, eval_test, if_val_or_test=True)
             if config["enable_wandb"]:
                 Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, checkpoint_name, config)
-            Logger.log_test(file_log_test_results, checkpoint_name, config, eval_test)
+            Logger.log_test(file_log_test_results, checkpoint_name, config, eval_test, if_val_or_test=True)
 
         save_path_cv = config.save_path / ('cv_' + str(cv + 1))
         #checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config) # TODO: remove
-        test_mean_loss, test_metrics = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, 'checkpoint_best', config)
+        test_mean_loss, test_metrics, mse_loss_conf_matr_mean = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, 'checkpoint_best', config, if_val_or_test=True)
         if not config["auto_encoder"]: test_metrics_sum = [sum(x) for x in zip(test_metrics_sum, test_metrics)]
         test_mean_loss_sum += test_mean_loss
+        mse_loss_conf_matr_mean_sum += mse_loss_conf_matr_mean
     
     Logger.print_section_line()
         
     test_metrics_avg = [m / config['num_cv'] for m in test_metrics_sum]
     test_mean_loss_avg = test_mean_loss_sum / config['num_cv']
+    mse_loss_conf_matr_mean_avg = mse_loss_conf_matr_mean_sum / config['num_cv']
     
-    test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg})()
-    Logger.printer('Testing Metrics Average Best:', config, test_eval_avg)
+    test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg, 'mse_loss_conf_matr_mean': mse_loss_conf_matr_mean_avg})()
+    Logger.printer('Testing Metrics Average Best:', config, test_eval_avg, if_val_or_test=True)
 
-    Logger.log_test(config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE_BEST, 'checkpoint_best', config, test_eval_avg)
+    Logger.log_test(config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE_BEST, 'checkpoint_best', config, test_eval_avg, if_val_or_test=True)
     
     if config["enable_wandb"]:
         Wandb.init(-1, checkpoint.wandb_id, config)

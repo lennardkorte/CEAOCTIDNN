@@ -47,5 +47,6 @@
     
     "auto_encoder": false,
     "encoder_group": "group_0",
-    "encoder_name": "rum_0"
+    "encoder_name": "rum_0",
+    "compare_classifier_predictions": true
 }

@@ -1,6 +1,7 @@
 
 import sys
 import json
+import numpy as np
 
 class Logger(object):
     def __enter__(self):
@@ -30,7 +31,7 @@ class Logger(object):
         print('\n--------------------------------------------------------')
         
     @staticmethod
-    def printer(title, config, eval_test):
+    def printer(title, config, eval_test, if_val_or_test = False):
         print('\n' + title)
         print("   Loss:          ", round(eval_test.mean_loss, config['early_stop_accuracy']))
         if not config["auto_encoder"]:
@@ -41,13 +42,16 @@ class Logger(object):
             print("   BACC:          ", round(eval_test.metrics[4], config['early_stop_accuracy']))
             print("   MCC:           ", round(eval_test.metrics[5], config['early_stop_accuracy']))
             print("   Prec.:         ", round(eval_test.metrics[6], config['early_stop_accuracy']))
+        elif if_val_or_test:
+            np.set_printoptions(suppress=True, precision=4, floatmode='fixed')
+            print('TP:', eval_test.mse_loss_conf_matr_mean[1,1], 'TN:', eval_test.mse_loss_conf_matr_mean[0,0], 'FP:', eval_test.mse_loss_conf_matr_mean[1,0], 'FN:', eval_test.mse_loss_conf_matr_mean[0,1])
 
     def printer_ae(title, early_stop_accuracy, mean_loss):
         print('\n' + title)
         print("   Loss:        ", round(mean_loss, early_stop_accuracy))
 
     @staticmethod
-    def log_test(file_log_test_results, description, config, eval_test):
+    def log_test(file_log_test_results, description, config, eval_test, if_val_or_test=False):
             try:
                 # Try to open the JSON file for reading (if it exists)
                 with open(file_log_test_results, 'r') as json_file:
@@ -71,6 +75,11 @@ class Logger(object):
                     'MCC': float(eval_test.metrics[5]),
                     'Prec.': float(eval_test.metrics[6])
                 })
+            elif if_val_or_test:
+                data_to_append[description].update({
+                    'mse_loss_conf_matr_mean': eval_test.mse_loss_conf_matr_mean.tolist(),
+                })
+            
 
             # Update the existing data with the new data
             existing_data.update(data_to_append)
@@ -80,7 +89,7 @@ class Logger(object):
                 json.dump(existing_data, json_file, indent=4)
     
     @staticmethod
-    def test_read(file_log_test_results, description, config):
+    def test_read(file_log_test_results, description, config, if_val_or_test=False):
         try:
             # Try to open the JSON file for reading (if it exists)
             with open(file_log_test_results, 'r') as json_file:
@@ -93,6 +102,7 @@ class Logger(object):
             
             # Extract the metrics array from the data
             metrics = []
+            mse_loss_conf_matr_mean = np.array([[0,0],[0,0]])
             if not config["auto_encoder"]:
                 metrics = [
                     float(data.get('Accuracy')),
@@ -103,8 +113,10 @@ class Logger(object):
                     float(data.get('MCC')),
                     float(data.get('Prec.'))
                 ]
+            elif if_val_or_test:
+                mse_loss_conf_matr_mean = np.array(data.get('mse_loss_conf_matr_mean'))
             
-            return mean_loss, metrics
+            return mean_loss, metrics, mse_loss_conf_matr_mean
 
         except (FileNotFoundError, json.JSONDecodeError):
             print("JSON file not found or could not be decoded.")

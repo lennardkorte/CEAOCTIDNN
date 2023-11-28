@@ -78,7 +78,7 @@ class Utils():
         loss_sum = 0
 
         num_batches = len(Dataloaders.trainInd)
-        print('Training {num_batches} batches.')
+        print('Training', num_batches, 'batches.')
 
         for j, (inputs, labels) in enumerate(Dataloaders.trainInd):
             
@@ -109,8 +109,6 @@ class Utils():
 
                 learning_rate_sum += optimizer.param_groups[0]['lr']
                 loss_sum += loss
-                
-            sys.stdout.write("\033[K")
 
         if config["enable_wandb"]:
             Wandb.wandb_train_one_epoch(loss / (j + 1), learning_rate_sum / (j + 1), config)

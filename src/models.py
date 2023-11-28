@@ -83,9 +83,9 @@ class Autoencoder(nn.Module):
 def create_autoencoder2(config):
 
     # Load the pretrained ResNet18 model from a ".pt" file
-    save_path = Path('./data/train_and_test', config['encoder_group'], config['name'])
-    save_path_cv = save_path / ('cv_' + str(config["num_cv"]))
-    for path in glob(str(save_path_cv / '*.pt')):
+    save_path_ae = Path('./data/train_and_test', config['encoder_group'], config['name'])
+    save_path_ae_cv = save_path_ae / ('cv_' + str(config["num_cv"]))
+    for path in glob(str(save_path_ae_cv / '*.pt')):
         if "checkpoint_best" in checkpoint_path:
             checkpoint_path = path
     
@@ -110,9 +110,9 @@ def create_autoencoder2(config):
 def create_autoencoder(config):
 
     # Load the pretrained ResNet18 model from a ".pt" file
-    save_path = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'])
-    save_path_cv = save_path / ('cv_' + str(config["num_cv"]))
-    for path in glob(str(save_path_cv / '*.pt')):
+    save_path_ae = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'])
+    save_path_ae_cv = save_path_ae / ('cv_' + str(config["num_cv"]))
+    for path in glob(str(save_path_ae_cv / '*.pt')):
         if "checkpoint_best" in path:
             checkpoint_path = path
     
