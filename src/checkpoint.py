@@ -19,12 +19,6 @@ from config import Config
 from models.model_resnet_autenc import ResNet18, create_autoenc_resnet18
 from models.model_unet1 import UNetClassifier1, load_unet1_with_classifier_weights
 from models.model_unet2 import UNetClassifier2, load_unet2_with_classifier_weights
-
-model = UNetClassifier1({'num_out':2})
-model = load_unet1_with_classifier_weights({'num_out':2})
-
-#model = UNetClassifier2({'num_out':2})
-#model = load_unet2_with_classifier_weights({'num_out':2})
              
 class Checkpoint():
     ''' This class represents a checkpoint of the training process, where the current status is stored.

@@ -10,21 +10,17 @@ name_container="container-${date}"
 echo -e "${green}\n\nBuilding docker-image...${reset}"
 docker build -t $name_image .
 
-echo -e "${green}\n\nRemoving additional <none> images...${reset}"
-#docker rm $(docker ps -a -q) > /dev/null 2>&1
-docker image prune -f
+# echo -e "${green}\n\nRemoving additional <none> images...${reset}"
+# docker image prune -f
 
 echo -e "${green}\n\nShow all images:${reset}"
 docker image ls
 
 # Run Container
-
-data_path="/docker_data/data"
-filename="train_and_test.py"
-
-echo -e "${green}\n\nRun docker-image:${reset}"
+echo -e "${green}\n\nRun docker-container:${reset}"
 args="$@"
 s_path="${PWD}/data"
+data_path="/app/data"
 docker run \
 -it \
 --rm \
@@ -32,5 +28,7 @@ docker run \
 --shm-size 8G \
 --name $name_container \
 --mount type=bind,source=$s_path,target=$data_path \
--i $name_image "src/${filename} ${args}"
+-i $name_image $args
 
+echo -e "${green}\n\nDelete old image:${reset}"
+docker image rm $name_image

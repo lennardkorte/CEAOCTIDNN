@@ -6,8 +6,11 @@ Supports 2D (https://arxiv.org/abs/1505.04597) and 3D(https://arxiv.org/abs/1606
 Author: Ishaan Bhat
 Email: ishaan@isi.uu.nl
 
-Perm github link:
+Permanent github link:
 https://github.com/ishaanb92/PyTorch-UNet/tree/16c40cca2a4ec22e7a0a3365d2ed7a3748cb79f7/src/unet
+
+Paper:
+https://arxiv.org/abs/1505.04597
 
 """
 from math import pow

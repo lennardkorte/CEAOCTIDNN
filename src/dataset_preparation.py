@@ -40,12 +40,9 @@ class DatasetPreparation():
                 if '.h5' in filename:
                     path_str = os.path.join(dirpath, filename).__str__()
                     all_files_paths.append(path_str)
-                    
-        if all_files_paths:
-            return all_files_paths
-        else:
-            warnings.warn("No training data found.")
-            exit()
+        
+        assert all_files_paths, "No training data found."
+        return all_files_paths
             
     def get_prepared_labels(self, config):
         # extract Labels for Data Set
@@ -93,7 +90,7 @@ class DatasetPreparation():
         
         length = len(set_cv_ind)
         if self.config['num_cv'] >= 4:
-            train_ind_subdivision = [set_cv_ind[i*length // self.config['num_cv']: (i+1)*length // self.config['num_cv']] for i in range(config['num_cv'])]
+            train_ind_subdivision = [set_cv_ind[i*length // self.config['num_cv']: (i+1)*length // self.config['num_cv']] for i in range(self.config['num_cv'])]
         elif self.config['num_cv'] == 1:
             split_point = int((length / 100) * self.config['set_percntage_val'])
             train_ind_subdivision = [set_cv_ind[:split_point], set_cv_ind[split_point:]]

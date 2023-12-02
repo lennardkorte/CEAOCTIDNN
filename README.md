@@ -126,9 +126,8 @@ The current model is saved in `latest_checkpoint.pt` after each epoch, while fin
   │   ├── dataset.py                - represents the dataset object to dataloader
   │   ├── eval.py                   - calculates metrics to assess performance
   │   ├── logger.py                 - for logging result files and printing tasks
-  │   ├── main.py                   - entrance point for application
   │   ├── models.py                 - defines all models to train on
-  │   ├── train_and_test.py         - Main training loop file
+  │   ├── main.py         - Main training and test loop file
   │   ├── utils_wandb.py            - Wandb logging class
   │   └── utils.py                  - Helper functions and utilities
   │

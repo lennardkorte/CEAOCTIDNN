@@ -1,6 +1,6 @@
 #! /bin/bash
 
-entrance_script="exe/run_train_and_eval_docker.sh"
+entrance_script="./exec_docker.sh"
 WANDB_API_KEY="8bea2fc48ca4a501eaec31dbfb410413a640b839"
 
 for (( b=16; b<=128; b=c*2 ))

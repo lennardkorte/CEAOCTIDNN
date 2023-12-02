@@ -1,7 +1,9 @@
 # Ignore everything
 **
 
+# Pip requirements
+!/requirements.txt
+
 # Allow files and directories
 !/src/**
 !/runs/**
-!/requirements.txt
