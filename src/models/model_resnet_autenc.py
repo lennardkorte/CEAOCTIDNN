@@ -7,7 +7,6 @@ import torch
 from torchvision import models
 from pathlib import Path
 from glob import glob
-import models_resnet_autenc
 
 class ResNet18(nn.Module):
     def __init__(self, config):
@@ -22,51 +21,202 @@ class ResNet18(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-class Decoder(nn.Module):
-    def __init__(self, input_size=(512, 7, 7), output_size=(1, 64, 64)):
-        super(Decoder, self).__init__()
+class ResNetDecoder(nn.Module):
 
-        # Initial input size (512, 7, 7)
-        self.initial_conv_transpose = nn.ConvTranspose2d(512, 256, kernel_size=4, stride=2, padding=1)
-        self.initial_batchnorm = nn.BatchNorm2d(256)
+    # use inverted configs as argument to create decoder, i.e.g: configs[::-1]
+    def __init__(self, configs, bottleneck=False):
+        super(ResNetDecoder, self).__init__()
 
-        # Upsampling layers
-        self.layer1 = self.create_decoder_block(256, 128)
-        #self.layer1_0 = self.create_decoder_block(128, 128) # TODO
-        self.layer2 = self.create_decoder_block(128, 64)
+        if len(configs) != 4:
+            raise ValueError("Only 4 layers can be configued")
 
-        self.extra_layer1 = self.create_decoder_block(64, 64, kernel_size=3, stride=1, padding=1)  # Add the first additional layer
-        self.extra_layer2 = self.create_decoder_block(64, 64, kernel_size=3, stride=1, padding=1)  # Add the second additional layer
+        if bottleneck:
 
-        self.layer3 = self.create_decoder_block(64, 32)
+            self.conv1 = DecoderBottleneckBlock(in_channels=2048, hidden_channels=512, down_channels=1024, layers=configs[0])
+            self.conv2 = DecoderBottleneckBlock(in_channels=1024, hidden_channels=256, down_channels=512,  layers=configs[1])
+            self.conv3 = DecoderBottleneckBlock(in_channels=512,  hidden_channels=128, down_channels=256,  layers=configs[2])
+            self.conv4 = DecoderBottleneckBlock(in_channels=256,  hidden_channels=64,  down_channels=64,   layers=configs[3])
 
-        # Output layer
-        self.final_conv_transpose = nn.ConvTranspose2d(32, 1, kernel_size=4, stride=2, padding=1)
-        self.output_activation = nn.Sigmoid()
 
-    def create_decoder_block(self, in_channels, out_channels, kernel_size=4, stride=2, padding=1):
-        return nn.Sequential(
-            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
+        else:
+
+            self.conv1 = DecoderResidualBlock(hidden_channels=512, output_channels=256, layers=configs[0])
+            self.conv2 = DecoderResidualBlock(hidden_channels=256, output_channels=128, layers=configs[1])
+            self.conv3 = DecoderResidualBlock(hidden_channels=128, output_channels=64,  layers=configs[2])
+            self.conv4 = DecoderResidualBlock(hidden_channels=64,  output_channels=64,  layers=configs[3])
+
+        self.conv5 = nn.Sequential(
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=7, stride=2, padding=3, output_padding=1, bias=False),
         )
 
+        self.gate = nn.Sigmoid()
+
     def forward(self, x):
-        x = self.initial_conv_transpose(x)
-        x = self.initial_batchnorm(x)
-        x = nn.ReLU(inplace=True)(x)
 
-        x = self.layer1(x)
-        #x = self.layer1_0(x)
-        x = self.layer2(x)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.conv5(x)
+        x = self.gate(x)
 
-        x = self.extra_layer1(x)  # Pass through the first additional layer
-        x = self.extra_layer2(x)  # Pass through the second additional layer
+        return x
 
-        x = self.layer3(x)
+class DecoderResidualBlock(nn.Module):
 
-        x = self.final_conv_transpose(x)
-        x = self.output_activation(x)
+    def __init__(self, hidden_channels, output_channels, layers):
+        super(DecoderResidualBlock, self).__init__()
+
+        for i in range(layers):
+
+            if i == layers - 1:
+                layer = DecoderResidualLayer(hidden_channels=hidden_channels, output_channels=output_channels, upsample=True)
+            else:
+                layer = DecoderResidualLayer(hidden_channels=hidden_channels, output_channels=hidden_channels, upsample=False)
+            
+            self.add_module('%02d EncoderLayer' % i, layer)
+    
+    def forward(self, x):
+
+        for name, layer in self.named_children():
+
+            x = layer(x)
+
+        return x
+
+class DecoderBottleneckBlock(nn.Module):
+
+    def __init__(self, in_channels, hidden_channels, down_channels, layers):
+        super(DecoderBottleneckBlock, self).__init__()
+
+        for i in range(layers):
+
+            if i == layers - 1:
+                layer = DecoderBottleneckLayer(in_channels=in_channels, hidden_channels=hidden_channels, down_channels=down_channels, upsample=True)
+            else:
+                layer = DecoderBottleneckLayer(in_channels=in_channels, hidden_channels=hidden_channels, down_channels=in_channels, upsample=False)
+            
+            self.add_module('%02d EncoderLayer' % i, layer)
+    
+    
+    def forward(self, x):
+
+        for name, layer in self.named_children():
+
+            x = layer(x)
+
+        return x
+
+class DecoderResidualLayer(nn.Module):
+
+    def __init__(self, hidden_channels, output_channels, upsample):
+        super(DecoderResidualLayer, self).__init__()
+
+        self.weight_layer1 = nn.Sequential(
+            nn.BatchNorm2d(num_features=hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=hidden_channels, out_channels=hidden_channels, kernel_size=3, stride=1, padding=1, bias=False),
+        )
+
+        if upsample:
+            self.weight_layer2 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)                
+            )
+        else:
+            self.weight_layer2 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            )
+
+        if upsample:
+            self.upsample = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=1, stride=2, output_padding=1, bias=False)   
+            )
+        else:
+            self.upsample = None
+    
+    def forward(self, x):
+
+        identity = x
+
+        x = self.weight_layer1(x)
+        x = self.weight_layer2(x)
+
+        if self.upsample is not None:
+            identity = self.upsample(identity)
+
+        x = x + identity
+
+        return x
+
+class DecoderBottleneckLayer(nn.Module):
+
+    def __init__(self, in_channels, hidden_channels, down_channels, upsample):
+        super(DecoderBottleneckLayer, self).__init__()
+
+        self.weight_layer1 = nn.Sequential(
+            nn.BatchNorm2d(num_features=in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=in_channels, out_channels=hidden_channels, kernel_size=1, stride=1, padding=0, bias=False),
+        )
+
+        self.weight_layer2 = nn.Sequential(
+            nn.BatchNorm2d(num_features=hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=hidden_channels, out_channels=hidden_channels, kernel_size=3, stride=1, padding=1, bias=False),
+        )
+
+        if upsample:
+            self.weight_layer3 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=down_channels, kernel_size=1, stride=2, output_padding=1, bias=False)
+            )
+        else:
+            self.weight_layer3 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=hidden_channels, out_channels=down_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+
+        if upsample:
+            self.upsample = nn.Sequential(
+                nn.BatchNorm2d(num_features=in_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=in_channels, out_channels=down_channels, kernel_size=1, stride=2, output_padding=1, bias=False)
+            )
+        elif (in_channels != down_channels):
+            self.upsample = None
+            self.down_scale = nn.Sequential(
+                nn.BatchNorm2d(num_features=in_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=in_channels, out_channels=down_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+        else:
+            self.upsample = None
+            self.down_scale = None
+    
+    def forward(self, x):
+
+        identity = x
+
+        x = self.weight_layer1(x)
+        x = self.weight_layer2(x)
+        x = self.weight_layer3(x)
+
+        if self.upsample is not None:
+            identity = self.upsample(identity)
+        elif self.down_scale is not None:
+            identity = self.down_scale(identity)
+
+        x = x + identity
 
         return x
 
@@ -103,8 +253,8 @@ def create_autoenc_resnet18(config):
     for param in encoder.parameters():
         param.requires_grad = False
 
-    arch, bottleneck = models_resnet_autenc.get_configs('resnet18')
-    decoder = models_resnet_autenc.ResNetDecoder(arch[::-1], bottleneck=bottleneck)
+    arch, bottleneck = [2, 2, 2, 2], False
+    decoder = ResNetDecoder(arch[::-1], bottleneck=bottleneck)
 
     autoencoder = Autoencoder(encoder, decoder)
 
