@@ -317,7 +317,9 @@ Configurations are copied and stored in the `name/` directory after starting the
     // Dataset specifics
     "define_sets_manually": true,
     "c2_or_c3": "ivoct_both_c2/",       // Specify on which data to train on
-    "cart_or_pol": "orig"               // "orig" chooses cartesian format as source. "pol" uses polar representation source 
+    "cart_or_pol": "orig"               // "orig" chooses cartesian format as source. "pol" uses polar representation source
+    
+    // TODO: Rename encoder in encoder_group and encoder_name to classifier
 }
 ```
 
