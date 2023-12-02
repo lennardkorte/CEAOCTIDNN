@@ -1,5 +1,5 @@
 # Original File: https://github.com/Horizon2333/imagenet-autoencoder/blob/536633ec1c0e9afe2dd91ce74b56e6e13479b6bd/models/resnet.py
-# This file manually builds Resnets with different configurations and their respective autoencoders
+# This manually builds Resnets with different configurations and their respective autoencoders
 
 import torch
 import torch.nn as nn
