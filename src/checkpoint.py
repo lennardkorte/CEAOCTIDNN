@@ -15,8 +15,16 @@ from torch.nn.parallel.data_parallel import DataParallel
 from eval import Eval
 from utils_wandb import Wandb
 from config import Config
-from models import *
 
+from models.model_resnet_autenc import ResNet18, create_autoenc_resnet18
+from models.model_unet1 import UNetClassifier1, load_unet1_with_classifier_weights
+from models.model_unet2 import UNetClassifier2, load_unet2_with_classifier_weights
+
+model = UNetClassifier1({'num_out':2})
+model = load_unet1_with_classifier_weights({'num_out':2})
+
+#model = UNetClassifier2({'num_out':2})
+#model = load_unet2_with_classifier_weights({'num_out':2})
              
 class Checkpoint():
     ''' This class represents a checkpoint of the training process, where the current status is stored.
@@ -25,11 +33,11 @@ class Checkpoint():
     
     model_map = {
         'ResNet18': ResNet18,
-        'ResNet18AutEnc': create_autoencoder,
-        'ResNext50': ResNext50,
-        'WideResNet50': WideResNet50,
-        'AlexNet': AlexNet,
-        'DenseNet121': DenseNet121
+        'ResNet18AutEnc': create_autoenc_resnet18,
+        'UNetClassifier1': UNetClassifier1,
+        'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
+        'UNetClassifier2': UNetClassifier2,
+        'load_unet2_with_classifier_weights': load_unet2_with_classifier_weights,
     }
     
     def __init__(self, name:str, save_path_cv:Path, device:device, config:Config):
