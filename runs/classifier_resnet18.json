@@ -5,7 +5,7 @@
     "show_samples": true,
     "overwrite_run": false,
     "data_augmentation": "6,7,9",
-    "overwrite_configurations": true,
+    "overwrite_configurations": false,
     "enable_wandb": false,
     "epochs": 200,
     "num_cv": 7
