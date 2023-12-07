@@ -1,0 +1,25 @@
+
+{
+    "group": "decoder_resnet18",
+    "name": "run_8",
+    "overwrite_run": false,
+    "model_type": "ResNet18AutEnc",
+    "loss_function": "MSELoss",
+    "auto_encoder": true,
+    "encoder_group": "classifier_resnet18",
+    "encoder_name": "run_21",
+    "early_stop_patience": 300,
+    "scheduler_step_size": 1,
+    "scheduler_gamma": 0.96,
+    "learning_rate": 1.5e-4,
+    "momentum": 0.85,
+    "num_cv": 7,                        
+    "epochs": 100,
+    "wb_project": "CEIMPA",
+    "batch_size": 8,
+    "enable_wandb": false,
+    "data_augmentation": "6,7,9",
+    "overwrite_configurations": true,
+    "show_samples": true,
+    "gpu": 0
+}
