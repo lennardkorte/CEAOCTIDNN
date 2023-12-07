@@ -3,3 +3,4 @@ opencv_python==4.8.1.78
 scikit_learn==1.0.2
 wandb==0.15.9
 polarTransform==2.0.0
+matplotlib==3.8.2
