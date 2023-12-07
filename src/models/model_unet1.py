@@ -495,7 +495,7 @@ class UNetWithoutSkips1(nn.Module):
         return x
 
 class UNetClassifier1(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, cv):
         super(UNetClassifier1, self).__init__()
 
         self.output_size = config['num_out']
@@ -511,16 +511,16 @@ class UNetClassifier1(nn.Module):
         x = self.fc(x)
         return x
 
-def load_unet1_with_classifier_weights(config):
-    unet_withoutskips = UNetWithoutSkips1(config)
+def load_unet1_with_classifier_weights(config, cv):
+    unet_withoutskips = UNetWithoutSkips1(config, cv)
 
     # Load the pretrained ResNet18 model from a ".pt" file
-    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(config["num_cv"])))
+    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
     for path in glob(str(save_path_ae_cv / '*.pt')):
         if "checkpoint_best" in path:
             checkpoint_path = path
     checkpoint = torch.load(checkpoint_path)
-    unet_classifier_dict = checkpoint['Model']
+    unet_classifier_dict = checkpoint['model_state_dict']
 
     # TODO: remove these two lines and load model from file instead
     #unet_classifier = UNetClassifier1(config)

@@ -9,7 +9,7 @@ from pathlib import Path
 from glob import glob
 
 class ResNet18(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, cv):
         super(ResNet18, self).__init__()
         self.output_size = config['num_out']
         weights = None
@@ -233,18 +233,18 @@ class Autoencoder(nn.Module):
         x = self.decoder(x)
         return x
 
-def create_autoenc_resnet18(config):
+def create_autoenc_resnet18(config, cv):
 
     # Load the pretrained ResNet18 model from a ".pt" file
-    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(config["num_cv"])))
+    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
     for path in glob(str(save_path_ae_cv / '*.pt')):
         if "checkpoint_best" in path:
             checkpoint_path = path
     
-    resnet = ResNet18(config)
+    resnet = ResNet18(config, cv)
 
     checkpoint = torch.load(checkpoint_path)
-    resnet.load_state_dict(checkpoint['Model'])
+    resnet.load_state_dict(checkpoint['model_state_dict'])
 
     # Define the encoder using the first layers of the model
     encoder = nn.Sequential(*list(resnet.net.children())[:-2])

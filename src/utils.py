@@ -47,26 +47,26 @@ class Utils():
             # Check if GPU is available
             assert torch.cuda.is_available(), "No GPU available"
             if config['gpu'] == 1:
-                assert 2 > torch.cuda.device_count(), "Chosen GPU not available"
+                assert 2 > torch.cuda.device_count(), "Second GPU not available"
             print("Chosen GPU is available")
 
         except AssertionError as error:
             # Handle the assertion error if no GPU is available
             print(f"Assertion Error: {error}")
             raise SystemExit("Program terminated due to lack of GPU.")
-
+        
         return torch.device(config['gpu'])
     
     @staticmethod
     def get_new_lossfunction(class_weights, device, loss_function):
         if loss_function == 'SmoothL1Loss':
-            return nn.SmoothL1Loss()
+            return nn.SmoothL1Loss(reduction='none')
         elif loss_function == 'cross_entropy':
-            return nn.CrossEntropyLoss(weight=class_weights.to(device))
+            return nn.CrossEntropyLoss(weight=class_weights.to(device), reduction='none')
         elif loss_function == 'L1Loss':
-            return nn.L1Loss()
+            return nn.L1Loss(reduction='none')
         else:
-            return nn.MSELoss()
+            return nn.MSELoss(reduction='none')
     
     @staticmethod
     def train_one_epoch(model, device, loss_function, scaler, optimizer, config):
@@ -88,30 +88,40 @@ class Utils():
             optimizer.zero_grad()
             
             with torch.set_grad_enabled(True):
+
+                # Runs the forward pass under autocast.
                 with torch.cuda.amp.autocast():
 
                     outputs = model(inputs)
 
                     if config["auto_encoder"]:
                         
-                        # TODO
-                        input_scaled = inputs
+                        # TODO: remove if not needed
                         # first_channel = inputs[:,:1,:,:]
-                        # input_scaled = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
+                        # inputs = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
                         
-                        loss = loss_function(outputs, input_scaled)
+                        loss_each = loss_function(outputs, inputs)
                     else:
-                        loss = loss_function(outputs, labels)
+                        loss_each = loss_function(outputs, labels)
                 
-                scaler.scale(loss).backward()
+                # Scales loss and calls backward()
+                # to create scaled gradients.
+                loss_all =  torch.mean(loss_each)
+                scaler.scale(loss_all).backward()
+                
+                # Unscales gradients and calls
+                # or skips optimizer.step().
                 scaler.step(optimizer)
+                
+                # Updates the scale for next iteration.
                 scaler.update()
 
+                #print(optimizer.param_groups[0]['lr'])
                 learning_rate_sum += optimizer.param_groups[0]['lr']
-                loss_sum += loss
+                loss_sum += loss_all
 
         if config["enable_wandb"]:
-            Wandb.wandb_train_one_epoch(loss / (j + 1), learning_rate_sum / (j + 1), config)
+            Wandb.wandb_train_one_epoch(loss_all / (j + 1), learning_rate_sum / (j + 1), config)
         
         return time.time() - start_it_epoch
 

@@ -1,6 +1,7 @@
 
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import math
 import torch.nn as nn
@@ -15,7 +16,7 @@ import skimage.segmentation
 from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 
 class Eval():
-    def __init__(self, dataloader, device, model, loss_function, config, save_path_cv, if_val_or_test=False):
+    def __init__(self, dataloader, device, model, loss_function, config, save_path_cv, cv, if_test=False):
         model.eval()
         
         for i, (inputs, labels) in enumerate(dataloader):
@@ -28,56 +29,87 @@ class Eval():
                     outputs = model(inputs)
                     
                     if config["auto_encoder"]:
-                        loss_batch = loss_function(outputs, inputs)
+                        loss_each = loss_function(outputs, inputs)
                     else:
-                        loss_batch = loss_function(outputs, labels)
+                        loss_each = loss_function(outputs, labels)
+            
+            if config["auto_encoder"]:
+                loss_each = torch.mean(loss_each, dim=[1,2,3]) # loss for each image in batch (8 floats for batch size 8)
             
             if i == 0:
-                loss_all_tensor = loss_batch.unsqueeze(0)
+                loss_all_tensor = loss_each
                 targets_tensor = labels
                 predictions_tensor = outputs
                 inputs_tensor = inputs
                     
             else:
-                loss_all_tensor = torch.cat([loss_all_tensor, loss_batch.unsqueeze(0)], 0)  # input (t*batch, cxbxwxh)
+                loss_all_tensor = torch.cat([loss_all_tensor, loss_each], 0)  # input (t*batch, cxbxwxh)
                 targets_tensor = torch.cat([targets_tensor, labels], 0)
                 predictions_tensor = torch.cat([predictions_tensor, outputs], 0)
                 inputs_tensor = torch.cat([inputs_tensor, inputs], 0)
                     
 
         # To numpy arrays
-        self.mean_loss = np.mean(loss_all_tensor.cpu().numpy())
+        loss_all = loss_all_tensor.cpu().numpy()
+        self.mean_loss = np.mean(loss_all)
 
         if not config["auto_encoder"]:
             self.metrics = self.calc_metrics(predictions_tensor, targets_tensor, config['num_out'])
             
-            if if_val_or_test:
+        
+        if if_test:
+            if not config["auto_encoder"]:
                 predictions_np = predictions_tensor.cpu().numpy()
                 classifier_predictions = np.argmax(predictions_np, 1)
 
                 # Writing integers to the file
-                predictions_file_name = save_path_cv / 'test_predictions.txt'
+                predictions_file_name = save_path_cv / 'test_predloss_pairs.txt'
                 with open(predictions_file_name, 'w') as file:
-                    for integer in classifier_predictions:
-                        file.write(f"{integer}\n")
+                    for int_class, float_loss in zip(classifier_predictions,loss_all):
+                        file.write(f"{int_class},{float_loss}\n")
 
-        else:
-            if if_val_or_test:
+            else:
                 self.save_auto_encoder_sample(inputs_tensor, predictions_tensor, save_path_cv)
 
                 if config['compare_classifier_predictions']:
 
                     # Reading integers from the file and writing them back to another variable
                     # Load the pretrained ResNet18 model from a ".pt" file
-                    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(config["num_cv"])))
+                    save_path_classifier = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
                     
-                    predictions_file_name = save_path_ae_cv / 'test_predictions.txt'
-                    classifier_predictions = []
+                    predictions_file_name = save_path_classifier / 'test_predloss_pairs.txt'
+                    classifier_predloss_pairs = []
                     with open(predictions_file_name, 'r') as file:
                         for line in file:
-                            classifier_predictions.append(int(line.strip()))
+                            parts = line.strip().split(',')
+                            classifier_predloss_pairs.append((int(parts[0]), float(parts[1])))
                     
+                    # print(classifier_predloss_pairs)
+                    # exit()
+                    classifier_predictions, classifier_losses = tuple(map(list, zip(*classifier_predloss_pairs)))
+
                     self.mse_loss_conf_matr_mean = self.calc_mse_loss_conf_matr_mean(inputs_tensor, predictions_tensor, targets_tensor, classifier_predictions)
+
+                    # Apply Threshold
+                    classifier_losses = np.array(classifier_losses)
+                    loss_all = np.array(loss_all)
+                    mask1 = np.array([elem < 2.0 for elem in classifier_losses])
+                    mask2 = np.array([elem < 0.001 for elem in loss_all])
+                    classifier_losses_threshold = classifier_losses[mask1 & mask2]
+                    loss_all_threshold = loss_all[mask1 & mask2]
+
+                    # Creating and storing the scatter plot for the larger dataset
+                    plot_file_path = save_path_cv / 'loss_distribution_plot.png'
+                    colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_tensor, classifier_predictions)])
+                    colors_threshold = colors[mask1 & mask2]
+                    plt.clf()
+                    plt.figure(figsize=(10, 6))
+                    plt.scatter(classifier_losses_threshold, loss_all_threshold, alpha=0.5, c=colors_threshold)
+                    plt.title('Loss Pair Distribution of Classifier vs Autoencoder')
+                    plt.xlabel('Classifier Loss')
+                    plt.ylabel('Autoencoder Loss')
+                    plt.grid(True)
+                    plt.savefig(plot_file_path)
 
             
     def save_auto_encoder_sample(self, inputs_tensor, predictions_tensor, save_path_cv):
@@ -186,14 +218,14 @@ class Eval():
             # F1 score
             f1 = f1_score(targets_np, np.argmax(predictions_np, 1), average='weighted')
         else:
-            tn, fp, fn, tp = conf_matrix.ravel()
+            tn, fp, fn, tp = conf_matrix.ravel() # TODO: raveling multiple times
             sensitivity = tp / (tp + fn)
             specificity = tn / (tn + fp)
             # F1 score
             f1 = f1_score(targets_np, np.argmax(predictions_np, 1))
         # Balanced accuracy
         bacc = (sensitivity + specificity) / 2
-        prec = tp / (tp + fp)
+        prec = tp / (tp + fp) if tp + fp != 0 else 0.0 #TODO: check zero div everywhere
         # Matthews Correlation Coefficient
         if (tp+fp) != 0 and (tp+fn) != 0 and (tn+fp) != 0 and (tn+fn) != 0:
             mcc = ((tp * tn) - (fp * fn)) / math.sqrt( (tp+fp) * (tp+fn) * (tn+fp) * (tn+fn) )

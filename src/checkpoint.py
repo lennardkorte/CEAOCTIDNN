@@ -25,16 +25,7 @@ class Checkpoint():
     All training and testing processes use the model in it.
     '''
     
-    model_map = {
-        'ResNet18': ResNet18,
-        'ResNet18AutEnc': create_autoenc_resnet18,
-        'UNetClassifier1': UNetClassifier1,
-        'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
-        'UNetClassifier2': UNetClassifier2,
-        'load_unet2_with_classifier_weights': load_unet2_with_classifier_weights,
-    }
-    
-    def __init__(self, name:str, save_path_cv:Path, device:device, config:Config):
+    def __init__(self, name:str, save_path_cv:Path, device:device, config:Config, cv:int):
         ''' Creates the first checkpoint of the training process.
         Stores most important components of the training process, e.g.: model, optimizer, wandb_id, etc.
         Note: DataLoaders are not stored in checkpoints. In deterministic (incl. shuffling).
@@ -48,9 +39,12 @@ class Checkpoint():
             The class constructor returns a "Checkpoint" object.
         '''
         
-        self.model = self.get_new_model(device, config)
+        self.model = self.get_new_model(device, config, cv) # TODO: Remove self. for checkpoint (seperation of concerns) -> pipeline should even work when checkpoint loading does not work
+        # TODO: Also store best vali epoch no
         self.scaler = torch.cuda.amp.GradScaler()
         self.optimizer = self.get_new_optimizer(self.model, config)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=config['scheduler_step_size'], gamma=config['scheduler_gamma'])
+        # 6: 5e-5, 3, 0.5, 30 epochs
         self.start_epoch = 1
         if config["enable_wandb"]:
             self.wandb_id = Wandb.get_id()
@@ -65,10 +59,11 @@ class Checkpoint():
                 
                 checkpoint = torch.load(checkpoint_path)
                 
-                self.model.load_state_dict(checkpoint['Model'])
-                self.optimizer.load_state_dict(checkpoint['Optimizer'])
-                self.scaler.load_state_dict(checkpoint['Scaler'])
-                self.start_epoch = checkpoint['Epoch'] + 1
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+                self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+                self.start_epoch = checkpoint['epoch'] + 1
                 if config["enable_wandb"]:
                     self.wandb_id = checkpoint['Wandb_ID']
                 self.eval_valid = namedtuple("eval_valid", checkpoint['eval_valid'].keys())(*checkpoint['eval_valid'].values())
@@ -105,10 +100,11 @@ class Checkpoint():
         '''
 
         state = {
-            'Epoch': epoch,
-            'Model': self.model.state_dict(),
-            'Optimizer': self.optimizer.state_dict(),
-            'Scaler': self.scaler.state_dict(),
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'scaler_state_dict': self.scaler.state_dict(),
             'eval_valid': vars(self.eval_valid),
             'eval_valid_best': vars(self.eval_valid_best)
         }
@@ -118,7 +114,7 @@ class Checkpoint():
         torch.save(state, save_path_cv / (name + '_at_epoch_' + str(epoch) + '.pt'))
     
     @classmethod
-    def get_new_model(cls, device:device, config:Config) -> DataParallel:
+    def get_new_model(cls, device:device, config:Config, cv:int) -> DataParallel:
         ''' Gets the right model specified in the configurations.
 
         Arguments:
@@ -129,10 +125,19 @@ class Checkpoint():
             Returns the right parallelized model fitting to the hardware.
         '''
         
-        if config['model_type'] not in cls.model_map:
+        model_map = {
+            'ResNet18': ResNet18,
+            'ResNet18AutEnc': create_autoenc_resnet18,
+            'UNetClassifier1': UNetClassifier1,
+            'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
+            'UNetClassifier2': UNetClassifier2,
+            'load_unet2_with_classifier_weights': load_unet2_with_classifier_weights,
+        }
+
+        if config['model_type'] not in model_map:
             raise ValueError('Name of model "{0}" unknown.'.format(config['model_type']))
         else:
-            model = cls.model_map[config['model_type']](config)
+            model = model_map[config['model_type']](config, cv)
             
         if len(config['gpus']) > 1:
             model = nn.DataParallel(model)

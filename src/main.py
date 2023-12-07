@@ -1,6 +1,7 @@
 import os
 import copy
 import time
+import torch
 import argparse
 import numpy as np
 
@@ -16,7 +17,7 @@ from dataset_preparation import DatasetPreparation
 
 FILE_NAME_TEST_RESULTS = 'test_results.json'
 FILE_NAME_TRAINING = 'training.log'
-FILE_NAME_TEST_RESULTS_AVERAGE_BEST = 'test_results_average_best.json'
+FILE_NAME_TEST_RESULTS_AVERAGE = 'test_results_average.json'
 
 def train_and_eval(config:Config):
 
@@ -28,10 +29,6 @@ def train_and_eval(config:Config):
     device = Utils.config_torch_and_cuda(config)
     
     loss_function = Utils.get_new_lossfunction(cust_data.class_weights, device, config['loss_function'])
-
-    test_mean_loss_sum = 0.0
-    test_metrics_sum = [0.0] * 10
-    mse_loss_conf_matr_mean_sum = np.array([[0.0, 0.0],[0.0, 0.0]])
 
     for cv in range(config['num_cv']):
 
@@ -66,7 +63,7 @@ def train_and_eval(config:Config):
                                                         )
                 print("\nTrain iterations / batches per epoch: ", int(len(Dataloaders.trainInd)))
                 
-                checkpoint = Checkpoint('checkpoint_last', save_path_cv, device, config)
+                checkpoint = Checkpoint('checkpoint_last', save_path_cv, device, config, cv + 1)
                 
                 pytorch_total_params = sum(p.numel() for p in checkpoint.model.parameters() if p.requires_grad)
                 print('Number of Training Parameters', pytorch_total_params)
@@ -87,20 +84,21 @@ def train_and_eval(config:Config):
                     
                     Logger.print_section_line()
                     duration_epoch = Utils.train_one_epoch(checkpoint.model, device, loss_function, checkpoint.scaler, checkpoint.optimizer, config)
+                    checkpoint.scheduler.step()
 
                     print('Evaluating epoch...')
                     duration_cv = time.time() - start_time
                     
-                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, loss_function, config, save_path_cv, if_val_or_test=False)
+                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
                     checkpoint.update_eval_valid(eval_valid, config)
                     
                     if config["enable_wandb"]:
-                        Wandb.wandb_log(eval_valid, cust_data.label_classes, epoch, checkpoint.optimizer, 'Validation', config)
+                        Wandb.wandb_log(eval_valid, cust_data.label_classes, epoch, checkpoint.optimizer, 'Validation Set', config)
 
                     if config['calc_train_error']:
-                        eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, loss_function, config, save_path_cv)
+                        eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
                         if config["enable_wandb"]:
-                            Wandb.wandb_log(eval_train, None, 0, None, 'Trainset Error', config)
+                            Wandb.wandb_log(eval_train, None, 0, None, 'Train Set Peak', config)
 
                     # Save epoch state and update metrics, es_counter, etc.
                     if config["auto_encoder"]:
@@ -108,12 +106,12 @@ def train_and_eval(config:Config):
                     else:
                         improvement_identified = round(checkpoint.eval_valid.metrics[5], config['early_stop_accuracy']) > round(validation_best_metrics_current_cv[5], config['early_stop_accuracy'])
                     
+                    no_overfitting = True
                     if config['calc_train_error'] and not config["auto_encoder"]:
-                        no_overfitting = round(checkpoint.eval_valid.metrics[5], config['early_stop_accuracy']) <= round(eval_train.metrics[5], config['early_stop_accuracy'])
-                    else:
-                        no_overfitting = True
+                        no_overfitting = round(checkpoint.eval_valid.metrics[5], config['early_stop_accuracy']) <= round(eval_train.metrics[5], config['early_stop_accuracy'])                        
                         
-                    if (improvement_identified and no_overfitting) or epoch == 1:
+                    best_epoch = improvement_identified and no_overfitting
+                    if best_epoch or epoch == 1:
                         checkpoint.save_checkpoint('checkpoint_best', epoch, save_path_cv, config)
                         
                         Checkpoint.delete_checkpoint('checkpoint_best', last_best_epoch_current_cv, save_path_cv)
@@ -130,7 +128,7 @@ def train_and_eval(config:Config):
                             Wandb.wandb_log(checkpoint.eval_valid, cust_data.label_classes, epoch, 'b-Validation', config)
 
                         if config['calc_and_peak_test_error']:
-                            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv)
+                            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
                             if config["enable_wandb"]:
                                 Wandb.wandb_log(eval_test, None, 0, None, 'Testset Error', config)
                             
@@ -177,37 +175,45 @@ def train_and_eval(config:Config):
         file_log_test_results = save_path_cv / FILE_NAME_TEST_RESULTS
         print('Testing performance with testset on:')
         for checkpoint_name in ['checkpoint_last', 'checkpoint_best']:
-            checkpoint = Checkpoint(checkpoint_name, save_path_cv, device, config)
+            checkpoint = Checkpoint(checkpoint_name, save_path_cv, device, config, cv + 1)
             if config["enable_wandb"] and 'WANDB_API_KEY' not in os.environ:
                 Wandb.init(cv, checkpoint.wandb_id, config)
                 
-            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, if_val_or_test=True)
+            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=True)
             Logger.printer(checkpoint_name, config, eval_test, if_val_or_test=True)
             if config["enable_wandb"]:
                 Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, checkpoint_name, config)
             Logger.log_test(file_log_test_results, checkpoint_name, config, eval_test, if_val_or_test=True)
 
-        save_path_cv = config.save_path / ('cv_' + str(cv + 1))
-        #checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config) # TODO: remove
-        test_mean_loss, test_metrics, mse_loss_conf_matr_mean = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, 'checkpoint_best', config, if_val_or_test=True)
-        if not config["auto_encoder"]: test_metrics_sum = [sum(x) for x in zip(test_metrics_sum, test_metrics)]
-        test_mean_loss_sum += test_mean_loss
-        mse_loss_conf_matr_mean_sum += mse_loss_conf_matr_mean
-    
     Logger.print_section_line()
-        
-    test_metrics_avg = [m / config['num_cv'] for m in test_metrics_sum]
-    test_mean_loss_avg = test_mean_loss_sum / config['num_cv']
-    mse_loss_conf_matr_mean_avg = mse_loss_conf_matr_mean_sum / config['num_cv']
-    
-    test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg, 'mse_loss_conf_matr_mean': mse_loss_conf_matr_mean_avg})()
-    Logger.printer('Testing Metrics Average Best:', config, test_eval_avg, if_val_or_test=True)
 
-    Logger.log_test(config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE_BEST, 'checkpoint_best', config, test_eval_avg, if_val_or_test=True)
+    for checkpoint_type in ['checkpoint_last', 'checkpoint_best']:
+        
+        test_mean_loss_sum = 0.0
+        test_metrics_sum = [0.0] * 10
+        mse_loss_conf_matr_mean_sum = np.array([[0.0, 0.0],[0.0, 0.0]])
+            
+        for cv in range(config['num_cv']):
+
+            save_path_cv = config.save_path / ('cv_' + str(cv + 1))
+            #checkpoint = Checkpoint('checkpoint_best', config.save_path / ('cv_' + str(cv + 1)), device, config) # TODO: remove
+            test_mean_loss, test_metrics, mse_loss_conf_matr_mean = Logger.test_read(save_path_cv / FILE_NAME_TEST_RESULTS, checkpoint_type, config, if_val_or_test=True)
+            if not config["auto_encoder"]: test_metrics_sum = [sum(x) for x in zip(test_metrics_sum, test_metrics)]
+            test_mean_loss_sum += test_mean_loss
+            mse_loss_conf_matr_mean_sum += mse_loss_conf_matr_mean
+            
+        test_metrics_avg = [m / config['num_cv'] for m in test_metrics_sum]
+        test_mean_loss_avg = test_mean_loss_sum / config['num_cv']
+        mse_loss_conf_matr_mean_avg = mse_loss_conf_matr_mean_sum / config['num_cv']
+        
+        test_eval_avg = type('obj', (object,), {'mean_loss': test_mean_loss_avg, 'metrics': test_metrics_avg, 'mse_loss_conf_matr_mean': mse_loss_conf_matr_mean_avg})()
+        Logger.printer(checkpoint_type + ' Metrics Average:', config, test_eval_avg, if_val_or_test=True)
+
+        Logger.log_test(config.save_path / FILE_NAME_TEST_RESULTS_AVERAGE, checkpoint_type, config, test_eval_avg, if_val_or_test=True)
     
-    if config["enable_wandb"]:
-        Wandb.init(-1, checkpoint.wandb_id, config)
-        Wandb.wandb_log(test_eval_avg, None, 0, None, 'Average Best', config)
+    #if config["enable_wandb"]: # TODO: uncomment and log for last checkpoint as well
+    #    Wandb.init(-1, checkpoint.wandb_id, config)
+    #    Wandb.wandb_log(test_eval_avg, None, 0, None, 'Average Best', config) # TODO: Called to often (only call once in an epoch) 
         
     print('')
         

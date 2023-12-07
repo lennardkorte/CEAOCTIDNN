@@ -11,16 +11,16 @@ import torch.nn as nn
 from pathlib import Path
 from glob import glob
 
-def load_unet2_with_classifier_weights(config):
-    unet_withoutskips = UNetWithoutSkips2(config)
+def load_unet2_with_classifier_weights(config, cv):
+    unet_withoutskips = UNetWithoutSkips2(config, cv)
 
     # Load the pretrained ResNet18 model from a ".pt" file
-    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(config["num_cv"])))
+    save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
     for path in glob(str(save_path_ae_cv / '*.pt')):
         if "checkpoint_best" in path:
             checkpoint_path = path
     checkpoint = torch.load(checkpoint_path)
-    unet_classifier_dict = checkpoint['Model']
+    unet_classifier_dict = checkpoint['model_state_dict']
 
     # TODO: remove these two lines and load model from file instead
     #unet_classifier = UNetClassifier2(config)
@@ -39,7 +39,7 @@ def load_unet2_with_classifier_weights(config):
     return unet_withoutskips
 
 class UNetClassifier2(nn.Module):
-    def __init__(self, config, in_channels=1, init_features=64):
+    def __init__(self, config, cv, in_channels=1, init_features=64):
         super(UNetClassifier2, self).__init__()
 
         self.output_size = config['num_out']
