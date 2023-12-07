@@ -98,7 +98,7 @@ The current model is saved in `latest_checkpoint.pt` after each epoch, while fin
 ```python
 {
 'Epoch': epoch,
-'Model': self.model.state_dict(),
+'model_state_dict': self.model.state_dict(), # TODO: keys changed
 'Optimizer': self.optimizer.state_dict(),
 'Scaler': self.scaler.state_dict(),
 'Wandb_ID': self.wandb_id
