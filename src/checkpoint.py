@@ -44,7 +44,7 @@ class Checkpoint():
         self.scaler = torch.cuda.amp.GradScaler()
         self.optimizer = self.get_new_optimizer(self.model, config)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=config['scheduler_step_size'], gamma=config['scheduler_gamma'])
-        # 6: 5e-5, 3, 0.5, 30 epochs
+
         self.start_epoch = 1
         if config["enable_wandb"]:
             self.wandb_id = Wandb.get_id()
