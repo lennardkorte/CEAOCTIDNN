@@ -23,10 +23,10 @@ class Utils():
     
     @staticmethod
     def config_torch_and_cuda(config):
-        if config['gpus'] is not None:
-            os.environ["CUDA_VISIBLE_DEVICES"] = config['gpus']
-            
-        print("Indices of devices to use:          ", os.environ["CUDA_VISIBLE_DEVICES"])
+        #if config['gpus'] is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0,1' #config['gpus']
+           
+        print("Indices of devices to use:", os.environ["CUDA_VISIBLE_DEVICES"])
         
         # Set location where torch stores its models
         os.environ['TORCH_HOME'] = './data/torch_pretrained_models'
@@ -47,8 +47,9 @@ class Utils():
             # Check if GPU is available
             assert torch.cuda.is_available(), "No GPU available"
             if config['gpu'] == 1:
-                assert 2 > torch.cuda.device_count(), "Second GPU not available"
+                assert 2 <= torch.cuda.device_count(), "Second GPU not available"
             print("Chosen GPU is available")
+            print(torch.cuda.get_device_name(config['gpu']))
 
         except AssertionError as error:
             # Handle the assertion error if no GPU is available

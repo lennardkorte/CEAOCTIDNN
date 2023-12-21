@@ -1,7 +1,7 @@
 
 {
     "group": "decoder_resnet18",
-    "name": "run_9",
+    "name": "run_9.1",
     "overwrite_run": true,
     "model_type": "ResNet18AutEnc",
     "loss_function": "MSELoss",
@@ -20,5 +20,6 @@
     "data_augmentation": "6,7,9",
     "overwrite_configurations": true,
     "show_samples": true,
-    "gpu": 0
+    "gpu": 0,
+    "weight_decay": 0.001
 }

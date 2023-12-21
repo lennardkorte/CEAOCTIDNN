@@ -8,7 +8,7 @@ class Dataloaders():
     def setup_data_loader_testset(cls, cust_data:DatasetPreparation, config):
         print('Images for Tests:                   ', len(cust_data.test_ind))
         # For Testing
-        num_workers = len(config['gpus']) * 4 # Recommended by Pytorch Docs
+        num_workers = 1 # len(config['gpus']) * 4 # Recommended by Pytorch Docs TODO
         cls.testInd = DataLoader(
             IVOCT_Dataset(cust_data.test_ind, cust_data.label_data, cust_data.all_files_paths, config),
             batch_size = config['batch_size'],
@@ -26,7 +26,7 @@ class Dataloaders():
         # TODO: remove the repetition in the following commands, maybe with for loop?
         # for ind_dataset, trainInd in zip():
 
-        num_workers = len(config['gpus']) * 4 # Recommended by Pytorch Docs
+        num_workers = 1 # len(config['gpus']) * 4 # Recommended by Pytorch Docs # TODO
         cls.trainInd = DataLoader(
             IVOCT_Dataset(train_ind_for_cv, cust_data.label_data, cust_data.all_files_paths, config, for_train=True),
             batch_size = config['batch_size'],

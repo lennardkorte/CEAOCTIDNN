@@ -58,7 +58,7 @@ class Config(dict):
         # Given arguments overwrite all other configs.
         config.update({
             'wandb':args.wandb,
-            'gpus':args.gpus
+            # 'gpus':args.gpus TODO
             })
         
         self.config = config

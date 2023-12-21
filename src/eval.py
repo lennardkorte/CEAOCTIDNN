@@ -21,7 +21,8 @@ class Eval():
         
         for i, (inputs, labels) in enumerate(dataloader):
             inputs = inputs.to(device)
-            labels = labels.squeeze().type(torch.LongTensor).to(device)
+            labels_long = labels.type(torch.LongTensor).to(device)
+            labels = labels.to(device)
             
             with torch.set_grad_enabled(False):
                 with torch.cuda.amp.autocast():
@@ -30,28 +31,43 @@ class Eval():
                     
                     if config["auto_encoder"]:
                         loss_each = loss_function(outputs, inputs)
+                        
+                        mse_loss_function = nn.L1Loss(reduction='none')
+                        loss_mse_each = mse_loss_function(outputs, inputs)
                     else:
-                        loss_each = loss_function(outputs, labels)
+                        loss_each = loss_function(outputs, labels_long)
+                        
+                        softmax_function = nn.Softmax(dim=1)
+                        outputs_softmax = softmax_function(outputs)
+                        nllloss_function = nn.NLLLoss(reduction='none')
+                        loss_mse_each = nllloss_function(outputs_softmax, labels_long)
             
             if config["auto_encoder"]:
                 loss_each = torch.mean(loss_each, dim=[1,2,3]) # loss for each image in batch (8 floats for batch size 8)
             
             if i == 0:
                 loss_all_tensor = loss_each
-                targets_tensor = labels
+                loss_mse_all_tensor = loss_mse_each
+                targets_tensor = labels_long
                 predictions_tensor = outputs
                 inputs_tensor = inputs
                     
             else:
-                loss_all_tensor = torch.cat([loss_all_tensor, loss_each], 0)  # input (t*batch, cxbxwxh)
-                targets_tensor = torch.cat([targets_tensor, labels], 0)
+                print(loss_all_tensor, loss_each)
+                print(loss_mse_all_tensor, loss_mse_each)
+                exit()
+                loss_all_tensor = torch.cat([loss_all_tensor, loss_each], 0)
+                loss_mse_all_tensor = torch.cat([loss_mse_all_tensor, loss_mse_each], 0)
+                targets_tensor = torch.cat([targets_tensor, labels_long], 0)
                 predictions_tensor = torch.cat([predictions_tensor, outputs], 0)
                 inputs_tensor = torch.cat([inputs_tensor, inputs], 0)
                     
 
         # To numpy arrays
         loss_all = loss_all_tensor.cpu().numpy()
+        loss_mse_all = loss_mse_all_tensor.cpu().numpy()
         self.mean_loss = np.mean(loss_all)
+        self.mean_loss_mse = np.mean(loss_mse_all)
 
         if not config["auto_encoder"]:
             self.metrics = self.calc_metrics(predictions_tensor, targets_tensor, config['num_out'])
@@ -65,7 +81,7 @@ class Eval():
                 # Writing integers to the file
                 predictions_file_name = save_path_cv / 'test_predloss_pairs.txt'
                 with open(predictions_file_name, 'w') as file:
-                    for int_class, float_loss in zip(classifier_predictions,loss_all):
+                    for int_class, float_loss in zip(classifier_predictions,loss_mse_all):
                         file.write(f"{int_class},{float_loss}\n")
 
             else:
@@ -100,14 +116,18 @@ class Eval():
 
                     # Creating and storing the scatter plot for the larger dataset
                     plot_file_path = save_path_cv / 'loss_distribution_plot.png'
+                    colors = []
+                    for t, p in zip(targets_tensor, classifier_predictions):
+                        color = 'green' if t == p else 'red'
+                        colors.append(color)
                     colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_tensor, classifier_predictions)])
                     colors_threshold = colors[mask1 & mask2]
                     plt.clf()
                     plt.figure(figsize=(10, 6))
-                    plt.scatter(classifier_losses_threshold, loss_all_threshold, alpha=0.5, c=colors_threshold)
+                    plt.scatter(loss_all_threshold, classifier_losses_threshold, alpha=0.5, c=colors_threshold)
                     plt.title('Loss Pair Distribution of Classifier vs Autoencoder')
-                    plt.xlabel('Classifier Loss')
-                    plt.ylabel('Autoencoder Loss')
+                    plt.xlabel('Autoencoder Loss')
+                    plt.ylabel('Classifier Loss')
                     plt.grid(True)
                     plt.savefig(plot_file_path)
 
@@ -182,7 +202,7 @@ class Eval():
         mse_loss_conf_matr = [[[],[]], [[],[]]]
         for input, prediction, classifier_target, classifier_prediction in zip(inputs, predictions, classifier_targets, classifier_predictions):
             mse_loss = loss_function_mse(input, prediction).cpu().numpy()
-            mse_loss_conf_matr[classifier_prediction][classifier_target].append(mse_loss)
+            mse_loss_conf_matr[int(classifier_prediction)][int(classifier_target)].append(mse_loss)
 
         # Calculating the mean of each list and storing it in a 2D matrix
         mse_loss_conf_matr_mean = np.array([[np.mean(lst) for lst in row] for row in mse_loss_conf_matr])

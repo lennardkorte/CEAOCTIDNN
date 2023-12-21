@@ -139,8 +139,8 @@ class Checkpoint():
         else:
             model = model_map[config['model_type']](config, cv)
             
-        if len(config['gpus']) > 1:
-            model = nn.DataParallel(model)
+        #if len(config['gpus']) > 1: #TODO
+        #    model = nn.DataParallel(model)
                 
         model.to(device)
         

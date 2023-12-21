@@ -220,7 +220,7 @@ def train_and_eval(config:Config):
 if __name__ == '__main__':
     args = argparse.ArgumentParser(description='IDDATDLOCT')
     args.add_argument('-cfg', '--config', default=None, type=str, help='config file path (default: None)')
-    args.add_argument('-gpu', '--gpus', default='0', type=str, help='indices of GPUs to enable (default: all)')
+    args.add_argument('-gpu', '--gpus', default='0', type=str, help='indices of GPUs to enable (default: all)') # TODO
     args.add_argument('-wb', '--wandb', default=None, type=str, help='Wandb API key (default: None)')
     args.add_argument('-ntt', '--no_trainandtest', dest='trainandtest', action='store_false', help='Deactivation of Training and Testing (default: Activated)')
     args.add_argument('-smp', '--show_samples', dest='show_samples', action='store_true', help='Activate creation of Sample from Data Augmentation (default: Deactivated)')

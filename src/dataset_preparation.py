@@ -97,12 +97,15 @@ class DatasetPreparation():
     def set_test_set_manually(self):
         # Function only used if define_sets_manually = True
 
-        SET_NAMES_ALL = ['set1', 'set2', 'set3', 'set4', 'set5', 'set6', 'set10', 'set14', 'set15', 'set17', 'set20',
-                            'set23', 'set24', 'set25', 'set26', 'set28', 'set29', 'set30', 'set32', 'set33', 'set35',
-                            'set37', 'set38', 'set39', 'set40', 'set42', 'set43', 'set44', 'set45', 'set47', 'set48',
-                            'set50', 'set52', 'set54', 'set55', 'set57', 'set59', 'set61', 'set62', 'set63', 'set64',
-                            'set65', 'set68', 'set69', 'set70', 'set72', 'set74', 'set75', 'set76'] # total: 49
+        SET_NAMES_ALL = ['set1',  'set2',  'set3',  'set4',  'set5',  'set6',  'set10', 
+                         'set14', 'set15', 'set17', 'set20', 'set23', 'set24', 'set25', 
+                         'set26', 'set28', 'set29', 'set30', 'set32', 'set33', 'set35',
+                         'set37', 'set38', 'set39', 'set40', 'set42', 'set43', 'set44',
+                         'set45', 'set47', 'set48', 'set50', 'set52', 'set54', 'set55',
+                         'set57', 'set59', 'set61', 'set62', 'set63', 'set64', 'set65',
+                         'set68', 'set69', 'set70', 'set72', 'set74', 'set75', 'set76'] # total: 49
         SET_NAMES_TEST = ['set1', 'set2', 'set23', 'set24', 'set37', 'set38', 'set50'] # total: 7
+        
         
         # Gets sets without testsets (complement)
         sets_for_cv = [item for item in SET_NAMES_ALL if item not in SET_NAMES_TEST]
@@ -111,6 +114,11 @@ class DatasetPreparation():
         sets_for_cv_grouped = []
         for index in range(7):
             sets_for_cv_grouped.append(sets_for_cv[index::7])
+        
+        # Define validations manually:
+        #sets_for_cv_grouped = []
+
+
         
         train_ind_subdivision = []
         for list_of_sets in sets_for_cv_grouped:
