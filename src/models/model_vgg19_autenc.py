@@ -8,24 +8,29 @@ from torchvision import models
 from pathlib import Path
 from glob import glob
 
-class ResNet18(nn.Module):
+class VGG19(nn.Module):
     def __init__(self, config, cv):
-        super(ResNet18, self).__init__()
+        super(VGG19, self).__init__()
         self.output_size = config['num_out']
         weights = None
-        if config['pretrained']: weights = models.ResNet18_Weights.DEFAULT
-        self.net = models.resnet18(weights=weights)
-        '''
-        # Modify the average pooling and fully connected layer
-        #self.net.avgpool = nn.AdaptiveAvgPool2d(1)
+        if config['pretrained']: weights = models.VGG19_Weights.IMAGENET1K_V1
+        self.net = models.vgg19(weights=weights)
 
-        # Add a dropout layer before the final fully connected layer
-        self.net.fc = nn.Sequential(
+        # Adding dropout to convolutional layers
+        feats_list = list(self.net.features)
+        new_feats_list = []
+        for feat in feats_list:
+            new_feats_list.append(feat)
+            if isinstance(feat, nn.Conv2d):
+                new_feats_list.append(nn.Dropout(p=0.5, inplace=True))
+        self.net.features = nn.Sequential(*new_feats_list)
+
+        # Modify the classifier - Adding Dropout
+        self.net.classifier = nn.Sequential(
+            *list(self.net.classifier.children())[:-1],  # Keep all layers except the last one
             nn.Dropout(config['dropout']),  # Add Dropout here
-            nn.Linear(512, self.output_size)  # The final Linear layer with desired output size
-        )'''
-        self.net.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.net.fc = nn.Linear(512, self.output_size)
+            nn.Linear(4096, self.output_size)  # The final Linear layer with desired output size
+        )
 
     def forward(self, x):
         return self.net(x)
@@ -242,7 +247,7 @@ class Autoencoder(nn.Module):
         x = self.decoder(x)
         return x
 
-def create_autoenc_resnet18(config, cv):
+def create_autoenc_vgg19(config, cv):
 
     # Load the pretrained ResNet18 model from a ".pt" file
     save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
@@ -250,7 +255,7 @@ def create_autoenc_resnet18(config, cv):
         if "checkpoint_best" in path:
             checkpoint_path = path
     
-    resnet = ResNet18(config, cv)
+    resnet = VGG19(config, cv)
 
     checkpoint = torch.load(checkpoint_path)
     resnet.load_state_dict(checkpoint['model_state_dict'])

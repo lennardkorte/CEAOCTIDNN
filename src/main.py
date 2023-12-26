@@ -6,7 +6,7 @@ import argparse
 import numpy as np
 
 from eval import Eval
-from utils import Utils
+from utils import Utils, comp_class_weights
 from config import Config
 from logger import Logger
 from checkpoint import Checkpoint
@@ -27,8 +27,6 @@ def train_and_eval(config:Config):
     Dataloaders.setup_data_loader_testset(cust_data, config)
     
     device = Utils.config_torch_and_cuda(config)
-    
-    loss_function = Utils.get_new_lossfunction(cust_data.class_weights, device, config['loss_function'])
 
     for cv in range(config['num_cv']):
 
@@ -46,21 +44,15 @@ def train_and_eval(config:Config):
         os.makedirs(save_path_cv, exist_ok=True)
         cv_done = True if any('test_results' in s for s in os.listdir(save_path_cv)) else False
 
+        valid_ind_for_cv, train_ind_for_cv = cust_data.get_train_valid_ind(cv)
+        Dataloaders.setup_data_loaders_training(train_ind_for_cv,train_ind_for_cv[::2],valid_ind_for_cv,cust_data,config)
+        class_weights = comp_class_weights(labels=cust_data.label_data[train_ind_for_cv])
+
         if cv_done:
             print('Skipped CV number:', cv+1, '(already trained)')
         else:
             with Logger(save_path_cv / FILE_NAME_TRAINING, 'a'):
                 print('Start CV number:', cv+1, '\n')
-                
-                valid_ind_for_cv, train_ind_for_cv = cust_data.get_train_valid_ind(cv)
-                train_eval_ind_for_cv = train_ind_for_cv[::2]
-                
-                Dataloaders.setup_data_loaders_training(train_ind_for_cv,
-                                                        train_eval_ind_for_cv,
-                                                        valid_ind_for_cv,
-                                                        cust_data,
-                                                        config
-                                                        )
                 print("\nTrain iterations / batches per epoch: ", int(len(Dataloaders.trainInd)))
                 
                 checkpoint = Checkpoint('checkpoint_last', save_path_cv, device, config, cv + 1)
@@ -83,20 +75,20 @@ def train_and_eval(config:Config):
                         break
                     
                     Logger.print_section_line()
-                    duration_epoch = Utils.train_one_epoch(checkpoint.model, device, loss_function, checkpoint.scaler, checkpoint.optimizer, config)
+                    duration_epoch = Utils.train_one_epoch(checkpoint.model, device, checkpoint.scaler, checkpoint.optimizer, config, class_weights)
                     checkpoint.scheduler.step()
 
                     print('Evaluating epoch...')
                     duration_cv = time.time() - start_time
                     
-                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
+                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
                     checkpoint.update_eval_valid(eval_valid, config)
                     
                     if config["enable_wandb"]:
                         Wandb.wandb_log(eval_valid, cust_data.label_classes, epoch, checkpoint.optimizer, 'Validation Set', config)
 
                     if config['calc_train_error']:
-                        eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
+                        eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
                         if config["enable_wandb"]:
                             Wandb.wandb_log(eval_train, None, 0, None, 'Train Set Peak', config)
 
@@ -128,7 +120,7 @@ def train_and_eval(config:Config):
                             Wandb.wandb_log(checkpoint.eval_valid, cust_data.label_classes, epoch, 'b-Validation', config)
 
                         if config['calc_and_peak_test_error']:
-                            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=False)
+                            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
                             if config["enable_wandb"]:
                                 Wandb.wandb_log(eval_test, None, 0, None, 'Testset Error', config)
                             
@@ -179,7 +171,7 @@ def train_and_eval(config:Config):
             if config["enable_wandb"] and 'WANDB_API_KEY' not in os.environ:
                 Wandb.init(cv, checkpoint.wandb_id, config)
                 
-            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, loss_function, config, save_path_cv, cv + 1, if_test=True)
+            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name=checkpoint_name, class_weights=class_weights)
             Logger.printer(checkpoint_name, config, eval_test, if_val_or_test=True)
             if config["enable_wandb"]:
                 Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, checkpoint_name, config)

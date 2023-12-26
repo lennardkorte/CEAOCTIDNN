@@ -1,0 +1,21 @@
+
+{
+    "group": "classifier_vgg19",
+    "wb_project": "CEIMPA",
+    "model_type": "VGG19",
+    "name": "run_27.3",
+    "show_samples": true,
+    "overwrite_run": true,
+    "data_augmentation": "6,7,9",
+    "overwrite_configurations": false,
+    "enable_wandb": true,
+    "epochs": 150,
+    "num_cv": 4,
+    "batch_size": 8,
+    "early_stop_patience": 200,
+    "learning_rate": 2e-5,
+    "scheduler_gamma": 0.5,
+    "scheduler_step_size": 20,
+    "weight_decay": 0.01,
+    "dropout": 0.1
+}

@@ -2,14 +2,17 @@
 {
     "group": "classifier_resnet18",
     "wb_project": "CEIMPA",
-    "name": "run_21",
+    "name": "run_24",
     "show_samples": true,
     "overwrite_run": false,
     "data_augmentation": "6,7,9",
     "overwrite_configurations": false,
     "enable_wandb": false,
-    "epochs": 15,
-    "num_cv": 7,
+    "epochs": 10,
+    "num_cv": 4,
     "early_stop_patience": 200,
-    "learning_rate": 5e-5
+    "learning_rate": 5e-5,
+    "scheduler_gamma": 0.85,
+    "weight_decay": 0.01,
+    "dropout": 0.1
 }

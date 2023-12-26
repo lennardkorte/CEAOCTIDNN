@@ -1,11 +1,10 @@
 
 from torch.utils.data import DataLoader
 from dataset import IVOCT_Dataset
-from dataset_preparation import DatasetPreparation
 
 class Dataloaders():
     @classmethod
-    def setup_data_loader_testset(cls, cust_data:DatasetPreparation, config):
+    def setup_data_loader_testset(cls, cust_data, config):
         print('Images for Tests:                   ', len(cust_data.test_ind))
         # For Testing
         num_workers = 1 # len(config['gpus']) * 4 # Recommended by Pytorch Docs TODO

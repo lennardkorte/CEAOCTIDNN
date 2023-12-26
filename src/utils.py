@@ -15,10 +15,12 @@ from collections import OrderedDict
 
 from utils_wandb import Wandb
 from data_loaders import Dataloaders
+from sklearn.utils.class_weight import compute_class_weight
 
 
 class Utils():
     ''' 
+    # TODO: remove utils
     '''
     
     @staticmethod
@@ -59,18 +61,13 @@ class Utils():
         return torch.device(config['gpu'])
     
     @staticmethod
-    def get_new_lossfunction(class_weights, device, loss_function):
-        if loss_function == 'SmoothL1Loss':
-            return nn.SmoothL1Loss(reduction='none')
-        elif loss_function == 'cross_entropy':
-            return nn.CrossEntropyLoss(weight=class_weights.to(device), reduction='none')
-        elif loss_function == 'L1Loss':
-            return nn.L1Loss(reduction='none')
+    def train_one_epoch(model, device, loss_function, scaler, optimizer, config, class_weights):
+
+        if config['auto_encoder']:
+            loss_function = nn.MSELoss()
         else:
-            return nn.MSELoss(reduction='none')
-    
-    @staticmethod
-    def train_one_epoch(model, device, loss_function, scaler, optimizer, config):
+            loss_function = nn.CrossEntropyLoss(weight=class_weights.to(device))
+
         start_it_epoch = time.time()
         model.train()
         print('')
@@ -101,13 +98,13 @@ class Utils():
                         # first_channel = inputs[:,:1,:,:]
                         # inputs = F.interpolate(first_channel, size=(32, 32), mode='bilinear', align_corners=False)
                         
-                        loss_each = loss_function(outputs, inputs)
+                        loss_all = loss_function(outputs, inputs)
                     else:
-                        loss_each = loss_function(outputs, labels)
+                        loss_all = loss_function(outputs, labels)
                 
                 # Scales loss and calls backward()
                 # to create scaled gradients.
-                loss_all =  torch.mean(loss_each)
+                #loss_all =  torch.mean(loss_each)
                 scaler.scale(loss_all).backward()
                 
                 # Unscales gradients and calls
@@ -122,7 +119,7 @@ class Utils():
                 loss_sum += loss_all
 
         if config["enable_wandb"]:
-            Wandb.wandb_train_one_epoch(loss_all / (j + 1), learning_rate_sum / (j + 1), config)
+            Wandb.wandb_train_one_epoch(loss_sum / (j + 1), learning_rate_sum / (j + 1), config)
         
         return time.time() - start_it_epoch
 
@@ -137,3 +134,12 @@ class Utils():
         file_name = Path(file_name)
         with file_name.open('wt') as handle:
             json.dump(content, handle, indent=4, sort_keys=False)
+
+def comp_class_weights(labels):
+    classes, counts = np.unique(labels, return_counts=True)
+    class_weights_comp = compute_class_weight(class_weight='balanced', classes=classes, y=labels)
+    print('\nClasses:      ', classes)
+    print('Counts:       ', counts)
+    print('Class weights:', class_weights_comp)
+    
+    return torch.tensor(class_weights_comp, dtype=torch.float)

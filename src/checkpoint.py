@@ -17,6 +17,7 @@ from utils_wandb import Wandb
 from config import Config
 
 from models.model_resnet_autenc import ResNet18, create_autoenc_resnet18
+from models.model_vgg19_autenc import VGG19, create_autoenc_vgg19
 from models.model_unet1 import UNetClassifier1, load_unet1_with_classifier_weights
 from models.model_unet2 import UNetClassifier2, load_unet2_with_classifier_weights
              
@@ -128,6 +129,8 @@ class Checkpoint():
         model_map = {
             'ResNet18': ResNet18,
             'ResNet18AutEnc': create_autoenc_resnet18,
+            'VGG19': VGG19,
+            'VGG19AutEnc': create_autoenc_vgg19,
             'UNetClassifier1': UNetClassifier1,
             'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
             'UNetClassifier2': UNetClassifier2,

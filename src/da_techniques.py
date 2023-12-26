@@ -11,7 +11,6 @@ from torchvision import transforms as T
 from torchvision.transforms.functional import InterpolationMode
 from scipy import signal
 from random import randrange
-import polarTransform as pt
 from guide_wire import guide_wire_literal
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
@@ -572,6 +571,27 @@ class BloodArtefacts(object):
         else:
             return result
 
+class AddGaussianNoise2(object):
+    def __init__(self):
+        pass
+        
+    def __call__(self, image_orig):
+        # Add noise to image
+        image = image_orig
+        mean = 0
+        stddev = 10000
+        noise = np.zeros_like(image)
+        cv.randn(noise, mean, stddev)
+        noisy_img = cv.add(image, noise)
+
+        height, width = image.shape
+        mask = np.zeros_like(noisy_img)
+        cv.circle(mask, (width//2, height//2), min(width, height)//2, (65535), thickness=-1)
+        final_image = cv.bitwise_and(noisy_img, mask)
+
+        return final_image
+
+
 class CLAHE(object):
     def __init__(self):
         pass
@@ -580,12 +600,22 @@ class CLAHE(object):
         image = image_orig
         #image = cv.equalizeHist(image)
         
-        clahe = cv.createCLAHE(clipLimit=40.0, tileGridSize=(60,60))
+        #clahe = cv.createCLAHE(clipLimit=40.0, tileGridSize=(60,60))
         #image = clahe.apply(image)
-        clahe = cv.createCLAHE(clipLimit=65535, tileGridSize=(3,3))
-        image = clahe.apply(image)
+        tile_size = 5
+        bordered_image = cv.copyMakeBorder(image, tile_size, tile_size, tile_size, tile_size, cv.BORDER_CONSTANT, value=0)
         
-        return image
+        clahe = cv.createCLAHE(clipLimit=65535, tileGridSize=(tile_size,tile_size))
+        clahe_image = clahe.apply(bordered_image)
+        
+        height, width = image.shape
+        cropped_image = clahe_image[tile_size:height+tile_size, tile_size:width+tile_size]
+
+        mask = np.zeros_like(cropped_image)
+        cv.circle(mask, (width//2, height//2), min(width, height)//2, (65535), thickness=-1)
+        final_image = cv.bitwise_and(cropped_image, mask)
+
+        return final_image
     
     
 class RandomShiftHor(object):
@@ -777,28 +807,30 @@ class AddGaussianNoise(object):
         self.mean = mean
         
     def __call__(self, tensor):
-        return tensor + torch.randn(tensor.size()) * self.std + self.mean
+        max_float16 = np.finfo(np.float16).max
+        noisy_tensor = tensor + torch.randn(tensor.size()) * self.std + self.mean
+        clamped_tensor = torch.clamp(noisy_tensor, min=-max_float16, max=max_float16)
+        return clamped_tensor
 
 class PartialMasking(object):
     def __init__(self):
         pass
     
     def __call__(self, image):
-        if torch.rand(1) <= 0.5:
-            size = 0.4
-            x = image.shape[0]
-            y = image.shape[1]
-            x_s = x * size
-            y_s = y * size
-            x_s = int(x_s * 0.5 + x_s * torch.rand(1))
-            y_s = int(y_s * 0.5 + y_s * torch.rand(1))
+        if torch.rand(1) <= 0.8:
+            size = 0.2
+            x, y = image.shape[1], image.shape[2]  # Assuming the input is in the shape [1, 300, 300]
+            x_s = int(x * size * (0.5 + torch.rand(1).item()))
+            y_s = int(y * size * (0.5 + torch.rand(1).item()))
+
+            x_p = int(torch.rand(1).item() * (x - x_s))
+            y_p = int(torch.rand(1).item() * (y - y_s))
             
-            x_p = int(torch.rand(1) * (x-x_s))
-            y_p = int(torch.rand(1) * (y-y_s))
-            image_return = np.copy(image)
-            image_return[x_p:x_p+x_s, y_p:y_p+y_s] = 0
+            image_return = image.clone()  # Clone the original tensor
+            image_return[:, x_p:x_p + x_s, y_p:y_p + y_s] = 0
         else:
             image_return = image
+
         return image_return
     
 '''
@@ -853,8 +885,6 @@ class DataAugmentationTechniques():
             # Posterizing
             RandomPosterize(bits=3, p=0.5),
             
-            
-            
             # Later maybe
             '''
             - GAN
@@ -907,7 +937,9 @@ class DataAugmentationTechniques():
             #PartialMasking(),
         ]
         pre_transforms = [
-            #CLAHE(),
+            
+            CLAHE(),
+            AddGaussianNoise2(),
             
             #CartToPolar(radius=112),
             
@@ -915,26 +947,30 @@ class DataAugmentationTechniques():
             ToFloat(),
             T.ToTensor(),
             
-            #AddGaussianNoise(0, 2000),
+            
             
             # preprozessing
             #MeanNormalization(),
             #Standardization_zero(),
             #Standardization_zero_five(),
-            Rescaling(), # note: if rescaling is removed, set a scaling factor in create_samples for better visibility
+            Rescaling(), # TODO rescale only circle # note: if rescaling is removed, set a scaling factor in create_samples for better visibility
             
         ]
         post_transforms = [
             T.Resize(size=output_shape, antialias=True),
+            #AddGaussianNoise(0, 5000),
             #AddDoubleZeroPadding(),
             ThreeChannelCopy(),
             #Standardization_IN(),
             
         ]
+        after_da = [
+            PartialMasking()
+        ]
         transforms_chosen = list(map(custom_transforms.__getitem__, transforms_ind_chosen))
         all_transforms = pre_transforms + transforms_chosen + post_transforms
         if for_train:
-            all_transforms = da_before_pre_transform + all_transforms
+            all_transforms = da_before_pre_transform + pre_transforms + transforms_chosen + after_da + post_transforms
         
         composed_transforms = T.Compose(all_transforms)
         return composed_transforms

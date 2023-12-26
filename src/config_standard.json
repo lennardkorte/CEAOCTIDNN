@@ -17,6 +17,7 @@
     "optimizer": "Adam",
     "weight_decay": 0.0,
     "momentum": 0.9,
+    "dropout": 0.5,
 
     "set_percentage_cv": 80,           
     "set_percentage_val": 20,           
