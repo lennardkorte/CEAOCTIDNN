@@ -121,7 +121,7 @@ class DatasetPreparation():
                     if set_name + '/' in file_path:
                         image_indices.append(index)
 
-                max_num_per_set = 100
+                max_num_per_set = 1000 # TODO try if improves
                 
                 # Separating indices based on the values they map to
                 indices_mapping_to_one = [index for index in image_indices if self.label_data[index] == 1]

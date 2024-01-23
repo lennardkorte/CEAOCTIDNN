@@ -8,51 +8,67 @@ from torchvision import models
 from pathlib import Path
 from glob import glob
 
-class ResNet18(nn.Module):
-    def __init__(self, config, cv):
-        super(ResNet18, self).__init__()
-        self.output_size = config['num_out']
-        weights = None
-        if config['pretrained']: weights = models.ResNet18_Weights.DEFAULT
-        self.net = models.resnet18(weights=weights)
-        '''
-        # Modify the average pooling and fully connected layer
-        #self.net.avgpool = nn.AdaptiveAvgPool2d(1)
+'''
+        from models.model_unet1 import UNetClassifier1, load_unet1_with_classifier_weights
+        from models.model_unet2 import UNetClassifier2, load_unet2_with_classifier_weights
+        'VGG19': VGG19,
+        'VGG19AutEnc': create_autoenc_vgg19,
+        'UNetClassifier1': UNetClassifier1,
+        'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
+        'UNetClassifier2': UNetClassifier2,
+        'load_unet2_with_classifier_weights': load_unet2_with_classifier_weights,'''
 
-        # Add a dropout layer before the final fully connected layer
-        self.net.fc = nn.Sequential(
+
+class VGG19(nn.Module):
+    def __init__(self, config, cv):
+        super(VGG19, self).__init__()
+        self.output_size = config['num_classes']
+        weights = None
+        if config['pretrained']: weights = models.VGG19_Weights.IMAGENET1K_V1
+        self.net = models.vgg19(weights=weights)
+
+        # Adding dropout to convolutional layers
+        feats_list = list(self.net.features)
+        new_feats_list = []
+        for feat in feats_list:
+            new_feats_list.append(feat)
+            if isinstance(feat, nn.Conv2d):
+                new_feats_list.append(nn.Dropout(p=0.5, inplace=True))
+        self.net.features = nn.Sequential(*new_feats_list)
+
+        # Modify the classifier - Adding Dropout
+        self.net.classifier = nn.Sequential(
+            *list(self.net.classifier.children())[:-1],  # Keep all layers except the last one
             nn.Dropout(config['dropout']),  # Add Dropout here
-            nn.Linear(512, self.output_size)  # The final Linear layer with desired output size
-        )'''
-        self.net.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.net.fc = nn.Linear(512, self.output_size)
+            nn.Linear(4096, self.output_size)  # The final Linear layer with desired output size
+        )
 
     def forward(self, x):
         return self.net(x)
 
 class ResNetDecoder(nn.Module):
 
-    # use inverted configs as argument to create decoder, i.e.g: configs[::-1]
-    def __init__(self, configs, bottleneck=False):
+    # use inverted layer_cfg as argument to create decoder, i.e.g: layer_cfg[::-1]
+    def __init__(self, layer_cfg, bottleneck=False):
         super(ResNetDecoder, self).__init__()
 
-        if len(configs) != 4:
+        if len(layer_cfg) != 4:
             raise ValueError("Only 4 layers can be configued")
 
         if bottleneck:
 
-            self.conv1 = DecoderBottleneckBlock(in_channels=2048, hidden_channels=512, down_channels=1024, layers=configs[0])
-            self.conv2 = DecoderBottleneckBlock(in_channels=1024, hidden_channels=256, down_channels=512,  layers=configs[1])
-            self.conv3 = DecoderBottleneckBlock(in_channels=512,  hidden_channels=128, down_channels=256,  layers=configs[2])
-            self.conv4 = DecoderBottleneckBlock(in_channels=256,  hidden_channels=64,  down_channels=64,   layers=configs[3])
+            self.conv1 = DecoderBottleneckBlock(in_channels=2048, hidden_channels=512, down_channels=1024, layers=layer_cfg[0])
+            self.conv2 = DecoderBottleneckBlock(in_channels=1024, hidden_channels=256, down_channels=512,  layers=layer_cfg[1])
+            self.conv3 = DecoderBottleneckBlock(in_channels=512,  hidden_channels=128, down_channels=256,  layers=layer_cfg[2])
+            self.conv4 = DecoderBottleneckBlock(in_channels=256,  hidden_channels=64,  down_channels=64,   layers=layer_cfg[3])
 
 
         else:
 
-            self.conv1 = DecoderResidualBlock(hidden_channels=512, output_channels=256, layers=configs[0])
-            self.conv2 = DecoderResidualBlock(hidden_channels=256, output_channels=128, layers=configs[1])
-            self.conv3 = DecoderResidualBlock(hidden_channels=128, output_channels=64,  layers=configs[2])
-            self.conv4 = DecoderResidualBlock(hidden_channels=64,  output_channels=64,  layers=configs[3])
+            self.conv1 = DecoderResidualBlock(hidden_channels=512, output_channels=256, layers=layer_cfg[0])
+            self.conv2 = DecoderResidualBlock(hidden_channels=256, output_channels=128, layers=layer_cfg[1])
+            self.conv3 = DecoderResidualBlock(hidden_channels=128, output_channels=64,  layers=layer_cfg[2])
+            self.conv4 = DecoderResidualBlock(hidden_channels=64,  output_channels=64,  layers=layer_cfg[3])
 
         self.conv5 = nn.Sequential(
             nn.BatchNorm2d(num_features=64),
@@ -242,7 +258,7 @@ class Autoencoder(nn.Module):
         x = self.decoder(x)
         return x
 
-def create_autoenc_resnet18(config, cv):
+def create_autoenc_vgg19(config, cv):
 
     # Load the pretrained ResNet18 model from a ".pt" file
     save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
@@ -250,7 +266,7 @@ def create_autoenc_resnet18(config, cv):
         if "checkpoint_best" in path:
             checkpoint_path = path
     
-    resnet = ResNet18(config, cv)
+    resnet = VGG19(config, cv)
 
     checkpoint = torch.load(checkpoint_path)
     resnet.load_state_dict(checkpoint['model_state_dict'])

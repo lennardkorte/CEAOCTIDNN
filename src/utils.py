@@ -61,7 +61,7 @@ class Utils():
         return torch.device(config['gpu'])
     
     @staticmethod
-    def train_one_epoch(model, device, loss_function, scaler, optimizer, config, class_weights):
+    def train_one_epoch(model, device, scaler, optimizer, config, class_weights):
 
         if config['auto_encoder']:
             loss_function = nn.MSELoss()

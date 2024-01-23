@@ -42,7 +42,7 @@ class UNetClassifier2(nn.Module):
     def __init__(self, config, cv, in_channels=1, init_features=64):
         super(UNetClassifier2, self).__init__()
 
-        self.output_size = config['num_out']
+        self.output_size = config['num_classes']
         features = init_features
         self.encoder1 = UNetWithoutSkips2._block(in_channels, features, name="enc1")
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)

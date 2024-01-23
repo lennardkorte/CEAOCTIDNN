@@ -584,12 +584,7 @@ class AddGaussianNoise2(object):
         cv.randn(noise, mean, stddev)
         noisy_img = cv.add(image, noise)
 
-        height, width = image.shape
-        mask = np.zeros_like(noisy_img)
-        cv.circle(mask, (width//2, height//2), min(width, height)//2, (65535), thickness=-1)
-        final_image = cv.bitwise_and(noisy_img, mask)
-
-        return final_image
+        return noisy_img
 
 
 class CLAHE(object):
@@ -610,12 +605,13 @@ class CLAHE(object):
         
         height, width = image.shape
         cropped_image = clahe_image[tile_size:height+tile_size, tile_size:width+tile_size]
-
+        '''
         mask = np.zeros_like(cropped_image)
         cv.circle(mask, (width//2, height//2), min(width, height)//2, (65535), thickness=-1)
         final_image = cv.bitwise_and(cropped_image, mask)
+        '''
 
-        return final_image
+        return cropped_image
     
     
 class RandomShiftHor(object):
@@ -833,6 +829,57 @@ class PartialMasking(object):
 
         return image_return
     
+class CircularMask(object):
+    def __init__(self, radius=1.0, invert=False):
+        self.mask = None
+        self.shape = None
+        self.radius = radius
+        self.invert = invert
+    
+    def __call__(self, images):
+        if len(images.shape) == 4:
+            # If the input is a batch of images ([batch_size, channels, height, width])
+            batches, channels, height, width = images.shape
+        elif len(images.shape) == 3:
+            # If the input is a single RGB image ([channels, height, width])
+            channels, height, width = images.shape
+        elif len(images.shape) == 2:
+            # If the input is a single grayscale image ([height, width])
+            height, width = images.shape
+        else:
+            raise ValueError("Unsupported image shape")
+
+        self._create_grid(height, width, images.device)
+        
+        if len(images.shape) == 2:
+            # For a single grayscale image, apply the mask directly
+            return images * self.mask
+        elif len(images.shape) in [3, 4]:
+            # For RGB images (single or batch), expand the mask to match the dimensions
+            expanded_mask = self.mask.unsqueeze(0)  # Add two dimensions: batch and channel
+            if len(images.shape) == 4:
+                expanded_mask = self.mask.unsqueeze(0)
+                expanded_mask = expanded_mask.repeat(images.size(0), channels, 1, 1)  # Repeat for batch and channels
+            else:
+                expanded_mask = expanded_mask.repeat(channels, 1, 1)  # Repeat for channels only for single image
+            return images * expanded_mask
+    
+    def _create_grid(self, height, width, device):
+        if not self.mask or self.shape != (height, width):
+            self.shape = (height, width)
+
+            x = torch.linspace(-1, 1, steps=width)
+            y = torch.linspace(-1, 1, steps=height)
+            grid_x, grid_y = torch.meshgrid(x, y, indexing='ij')
+
+            # Create the mask
+            self.mask = ((grid_x ** 2 + grid_y ** 2) <= self.radius ** 2).to(device)
+
+            # Invert the mask if the invert flag is True
+            if self.invert:
+                self.mask = ~self.mask
+
+
 '''
 Concatenation
 --------------------------------------------
@@ -875,7 +922,7 @@ class DataAugmentationTechniques():
             # random crop, random aspect ratio, resize
             T.RandomResizedCrop(size=image.shape, scale=(0.8, 1.0), ratio=(1.0, 1.0), antialias=True), # also used in Inception networks
             # random rotation, random scale, repositioning
-            T.RandomAffine(degrees=(-180,180), translate=(0, 0), scale=(0.8, 1.2), fill=0, interpolation=InterpolationMode.BILINEAR), 
+            T.RandomAffine(degrees=(-180,180), translate=(0, 0), fill=0, interpolation=InterpolationMode.BILINEAR), #, scale=(0.8, 1.2)
             
             
             # Grayscaling
@@ -939,7 +986,7 @@ class DataAugmentationTechniques():
         pre_transforms = [
             
             CLAHE(),
-            AddGaussianNoise2(),
+            #AddGaussianNoise2(),
             
             #CartToPolar(radius=112),
             
@@ -949,6 +996,7 @@ class DataAugmentationTechniques():
             
             
             
+
             # preprozessing
             #MeanNormalization(),
             #Standardization_zero(),
@@ -960,12 +1008,14 @@ class DataAugmentationTechniques():
             T.Resize(size=output_shape, antialias=True),
             #AddGaussianNoise(0, 5000),
             #AddDoubleZeroPadding(),
+            CircularMask(),
+            CircularMask(0.17, True),
             ThreeChannelCopy(),
             #Standardization_IN(),
             
         ]
         after_da = [
-            PartialMasking()
+            PartialMasking(),
         ]
         transforms_chosen = list(map(custom_transforms.__getitem__, transforms_ind_chosen))
         all_transforms = pre_transforms + transforms_chosen + post_transforms

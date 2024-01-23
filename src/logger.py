@@ -79,6 +79,14 @@ class Logger(object):
                 data_to_append[description].update({
                     'mse_loss_conf_matr_mean': eval_test.mse_loss_conf_matr_mean.tolist(),
                 })
+            '''
+                data_to_append[description].update({
+                    'loss_TP': float(eval_test.mse_loss_conf_matr_mean[1,1]),
+                    'loss_TN': float(eval_test.mse_loss_conf_matr_mean[0,0]),
+                    'loss_FP': float(eval_test.mse_loss_conf_matr_mean[1,0]),
+                    'loss_FN': float(eval_test.mse_loss_conf_matr_mean[0,1])
+                })
+            '''
             
 
             # Update the existing data with the new data

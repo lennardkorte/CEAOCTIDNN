@@ -30,7 +30,7 @@ class Wandb():
         return wandb.util.generate_id()
 
     @staticmethod   
-    def wandb_log(eval_test, class_labels, epoch, optimizer, prefix, config):
+    def wandb_log(eval_test, class_labels, epoch, optimizer, prefix, config, loss_matr=True):
         if config['enable_wandb']:
             dict = {
                 prefix + ' Loss': eval_test.mean_loss
@@ -44,6 +44,13 @@ class Wandb():
                     prefix + ' BACC': eval_test.metrics[4],
                     prefix + ' MCC': eval_test.metrics[5],
                     prefix + ' PPV': eval_test.metrics[6],
+                })
+            if config['auto_encoder'] and loss_matr:
+                dict.update({
+                    'loss_TP': eval_test.mse_loss_conf_matr_mean[1,1],
+                    'loss_TN': eval_test.mse_loss_conf_matr_mean[0,0],
+                    'loss_FP': eval_test.mse_loss_conf_matr_mean[1,0],
+                    'loss_FN': eval_test.mse_loss_conf_matr_mean[0,1]
                 })
             
             if optimizer is not None:

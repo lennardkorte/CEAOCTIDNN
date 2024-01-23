@@ -81,7 +81,7 @@ def train_and_eval(config:Config):
                     print('Evaluating epoch...')
                     duration_cv = time.time() - start_time
                     
-                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
+                    eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name='checkpoint_valid', class_weights=class_weights)
                     checkpoint.update_eval_valid(eval_valid, config)
                     
                     if config["enable_wandb"]:
@@ -90,7 +90,7 @@ def train_and_eval(config:Config):
                     if config['calc_train_error']:
                         eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
                         if config["enable_wandb"]:
-                            Wandb.wandb_log(eval_train, None, 0, None, 'Train Set Peak', config)
+                            Wandb.wandb_log(eval_train, None, 0, None, 'Train Set Peak', config, False)
 
                     # Save epoch state and update metrics, es_counter, etc.
                     if config["auto_encoder"]:
@@ -117,12 +117,12 @@ def train_and_eval(config:Config):
                         last_best_epoch_current_cv = epoch
                         
                         if config["enable_wandb"] and config['b_logging_active']:
-                            Wandb.wandb_log(checkpoint.eval_valid, cust_data.label_classes, epoch, 'b-Validation', config)
+                            Wandb.wandb_log(checkpoint.eval_valid, cust_data.label_classes, epoch, 'b-Validation', config, False)
 
                         if config['calc_and_peak_test_error']:
                             eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights)
                             if config["enable_wandb"]:
-                                Wandb.wandb_log(eval_test, None, 0, None, 'Testset Error', config)
+                                Wandb.wandb_log(eval_test, None, 0, None, 'Testset Error', config, False)
                             
                     else:
                         es_counter += 1
@@ -138,7 +138,6 @@ def train_and_eval(config:Config):
                     checkpoint.save_checkpoint('checkpoint_last', epoch, save_path_cv, config)
                     if epoch != 1:
                         Checkpoint.delete_checkpoint('checkpoint_last', epoch - 1, save_path_cv)
-                    
                     
                     # Print epoch results
                     np.set_printoptions(precision=4)

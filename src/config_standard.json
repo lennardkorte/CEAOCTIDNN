@@ -10,14 +10,17 @@
     "deterministic_training": true,
     "deterministic_batching": true,    
     
-    "model_type": "ResNet18",
+    "architecture": "resnet50",
+    "arch_version": 2.0,
     "pretrained": true,
-    "num_out": 2,
+    "num_classes": 2,
     "loss_function": "cross_entropy",
     "optimizer": "Adam",
-    "weight_decay": 0.0,
+    "weight_decay": 0.01,
     "momentum": 0.9,
-    "dropout": 0.5,
+    "dropout": 0.2,
+
+    "MCdropout_test": false,
 
     "set_percentage_cv": 80,           
     "set_percentage_val": 20,           
@@ -51,6 +54,6 @@
     
     "auto_encoder": false,
     "encoder_group": "group_0",
-    "encoder_name": "rum_0",
+    "encoder_name": "run_0",
     "compare_classifier_predictions": true
 }

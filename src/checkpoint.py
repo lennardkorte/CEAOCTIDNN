@@ -16,10 +16,7 @@ from eval import Eval
 from utils_wandb import Wandb
 from config import Config
 
-from models.model_resnet_autenc import ResNet18, create_autoenc_resnet18
-from models.model_vgg19_autenc import VGG19, create_autoenc_vgg19
-from models.model_unet1 import UNetClassifier1, load_unet1_with_classifier_weights
-from models.model_unet2 import UNetClassifier2, load_unet2_with_classifier_weights
+from architectures.builder import architecture_builder
              
 class Checkpoint():
     ''' This class represents a checkpoint of the training process, where the current status is stored.
@@ -126,22 +123,42 @@ class Checkpoint():
             Returns the right parallelized model fitting to the hardware.
         '''
         
-        model_map = {
-            'ResNet18': ResNet18,
-            'ResNet18AutEnc': create_autoenc_resnet18,
-            'VGG19': VGG19,
-            'VGG19AutEnc': create_autoenc_vgg19,
-            'UNetClassifier1': UNetClassifier1,
-            'load_unet1_with_classifier_weights': load_unet1_with_classifier_weights,
-            'UNetClassifier2': UNetClassifier2,
-            'load_unet2_with_classifier_weights': load_unet2_with_classifier_weights,
-        }
+        model = architecture_builder(config['architecture'], config['arch_version'], config['dropout'], config['num_classes'])
+        
+        # Load the pretrained ResNet model from a ".pt" file
+        save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
+        for path in glob(str(save_path_ae_cv / '*.pt')):
+            if "checkpoint_best" in path:
+                checkpoint_path = path
 
-        if config['model_type'] not in model_map:
-            raise ValueError('Name of model "{0}" unknown.'.format(config['model_type']))
+        checkpoint = torch.load(checkpoint_path)
+        # TODO only load layers that are the same in encoder
+        model.load_state_dict(checkpoint['model_state_dict'])
+
+        # Set the encoder layers to be non-trainable
+        for param in encoder.parameters():
+            param.requires_grad = False
+
+        # TODO transfer learning image net config['pretrained']
+        # TODO: Write why what modules used, i.e. why version 2?
+        # TODO: dropout for VGG
+        # TODO: add averaging of three output channels
+        # TODO: check normalization of GT and generated image images
+        # TODO: is there pluspoints for providing code?
+        
+        '''
+        import torch.nn.parallel as parallel
+
+        if args.parallel == 1:
+            model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model = parallel.DistributedDataParallel(
+                            model.to(args.gpu),
+                            device_ids=[args.gpu],
+                            output_device=args.gpu
+                        )   
         else:
-            model = model_map[config['model_type']](config, cv)
-            
+            model = nn.DataParallel(model).cuda()'''
+
         #if len(config['gpus']) > 1: #TODO
         #    model = nn.DataParallel(model)
                 

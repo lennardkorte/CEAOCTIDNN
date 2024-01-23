@@ -498,7 +498,7 @@ class UNetClassifier1(nn.Module):
     def __init__(self, config, cv):
         super(UNetClassifier1, self).__init__()
 
-        self.output_size = config['num_out']
+        self.output_size = config['num_classes']
 
         self.contracting_path = UNetWithoutSkips1(config).contracting_path
         self.avgpool = nn.AdaptiveAvgPool2d(1)
