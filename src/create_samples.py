@@ -11,7 +11,7 @@ from config import Config
 from da_techniques import DataAugmentationTechniques
 
 def create_samples(config: Config) -> None:
-    raw_images_dir = './data/h5s/original/' + config['c2_or_c3'] + config['cart_or_pol'] + '/'
+    raw_images_dir = './data/datasets/001/h5s/original/' + config['c2_or_c3'] + config['cart_or_pol'] + '/'
     # Calculate how many .h5 files are in directory
     file_count = sum(len(filenames) for _, _, filenames in os.walk(raw_images_dir))
     print("Total image number: " + str(file_count))
