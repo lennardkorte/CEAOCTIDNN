@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import resnet
+from . import resnet
 
 def get_configs(arch):
 

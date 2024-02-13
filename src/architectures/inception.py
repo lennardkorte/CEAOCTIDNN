@@ -1,8 +1,7 @@
-import os
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models
+import torch.nn.functional as F #TODO use nn.MaxPool2d instead
+from . import resnet
 
 class Inception3(nn.Module):
     def __init__(self, aux_logits=True, transform_input=False, z_dim=1000):
