@@ -119,7 +119,7 @@ class Utils():
                 loss_sum += loss_all
 
         if config["enable_wandb"]:
-            Wandb.wandb_train_one_epoch(loss_sum / (j + 1), learning_rate_sum / (j + 1), config)
+            Wandb.wandb_train_one_epoch(loss_sum / (j + 1), learning_rate_sum / (j + 1))
         
         return time.time() - start_it_epoch
 
