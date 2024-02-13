@@ -4,24 +4,18 @@ import json
 import numpy as np
 
 class Logger(object):
-    def __enter__(self):
-        pass
+    def __enter__(self):    
+        self.stdout = sys.stdout
+        sys.stdout = self
+        return self
     
     def __exit__(self, exception_type, exception_value, traceback):
         sys.stdout = self.stdout
         self.file.close()
-        pass
     
     def __init__(self, file_name, mode, terminal=True):
         self.terminal = terminal
         self.file = open(file_name, mode)
-        self.stdout = sys.stdout
-        sys.stdout = self
-        
-    def __del__(self):
-        sys.stdout = self.stdout
-        if not self.file.closed:
-            self.file.close()
         
     def write(self, data):
         if data != '\n':
@@ -31,7 +25,7 @@ class Logger(object):
         
     def flush(self):
         self.file.flush()
-        if not self.terminal:
+        if self.terminal:
             self.stdout.flush()
         
     @staticmethod
