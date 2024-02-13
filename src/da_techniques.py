@@ -985,7 +985,7 @@ class DataAugmentationTechniques():
         ]
         pre_transforms = [
             
-            CLAHE(),
+            #CLAHE(),
             #AddGaussianNoise2(),
             
             #CartToPolar(radius=112),
