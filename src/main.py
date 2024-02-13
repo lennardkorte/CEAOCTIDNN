@@ -23,7 +23,6 @@ def train_and_eval(config:Config):
 
     cust_data = DatasetPreparation(config)
         
-    Logger.print_section_line()
     Dataloaders.setup_data_loader_testset(cust_data, config)
     
     device = Utils.config_torch_and_cuda(config)
@@ -37,8 +36,6 @@ def train_and_eval(config:Config):
             validation_best_mean_loss_current_cv = 10000000
         else:
             validation_best_metrics_current_cv = [0.0] * 9
-        
-        Logger.print_section_line()
         
         save_path_cv = config.save_path / ('cv_' + str(cv + 1))
         os.makedirs(save_path_cv, exist_ok=True)
@@ -65,8 +62,7 @@ def train_and_eval(config:Config):
 
                 start_time = time.time()
                 
-                Logger.print_section_line()
-                print("Training...")
+                print("\n Training...")
                 early_stop = False
                 es_counter = 0
                 
@@ -74,7 +70,6 @@ def train_and_eval(config:Config):
                     if early_stop:
                         break
                     
-                    Logger.print_section_line()
                     duration_epoch = Utils.train_one_epoch(checkpoint.model, device, checkpoint.scaler, checkpoint.optimizer, config, class_weights)
                     checkpoint.scheduler.step()
 
@@ -160,8 +155,6 @@ def train_and_eval(config:Config):
 
                     if config['calc_and_peak_test_error']:
                         Logger.printer('Testing Metrics (tests on testing set):', config, eval_test)
-        
-        Logger.print_section_line()
 
         file_log_test_results = save_path_cv / FILE_NAME_TEST_RESULTS
         print('Testing performance with testset on:')
@@ -175,8 +168,6 @@ def train_and_eval(config:Config):
             if config["enable_wandb"]:
                 Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, checkpoint_name, config)
             Logger.log_test(file_log_test_results, checkpoint_name, config, eval_test, if_val_or_test=True)
-
-    Logger.print_section_line()
 
     for checkpoint_type in ['checkpoint_last', 'checkpoint_best']:
         
