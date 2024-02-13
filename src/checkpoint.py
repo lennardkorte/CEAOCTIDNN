@@ -130,23 +130,15 @@ class Checkpoint():
         for path in glob(str(save_path_ae_cv / '*.pt')):
             if "checkpoint_best" in path:
                 checkpoint_path = path
+                checkpoint = torch.load(checkpoint_path)
+                # TODO only load layers that are the same in encoder
+                model.load_state_dict(checkpoint['model_state_dict'])
 
-        checkpoint = torch.load(checkpoint_path)
-        # TODO only load layers that are the same in encoder
-        model.load_state_dict(checkpoint['model_state_dict'])
-
-        # Set the encoder layers to be non-trainable
-        for param in encoder.parameters():
-            param.requires_grad = False
-
-        # TODO transfer learning image net config['pretrained']
-        # TODO: Write why what modules used, i.e. why version 2?
-        # TODO: dropout for VGG
-        # TODO: add averaging of three output channels
-        # TODO: check normalization of GT and generated image images
-        # TODO: is there pluspoints for providing code?
-        
         '''
+        #if len(config['gpus']) > 1: #TODO
+        #    model = nn.DataParallel(model)
+                
+        
         import torch.nn.parallel as parallel
 
         if args.parallel == 1:
@@ -159,9 +151,7 @@ class Checkpoint():
         else:
             model = nn.DataParallel(model).cuda()'''
 
-        #if len(config['gpus']) > 1: #TODO
-        #    model = nn.DataParallel(model)
-                
+        
         model.to(device)
         
         return model
