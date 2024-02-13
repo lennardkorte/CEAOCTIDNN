@@ -5,6 +5,8 @@
     "overwrite_run": false,
     "overwrite_configurations": false,
     "gpu": 0,
+
+    "dataset_no": 0,
     
     "use_cuda": true,
     "deterministic_training": true,
@@ -46,9 +48,9 @@
     "early_stop_patience": 25,           
     "early_stop_accuracy": 7,          
     "data_augmentation": "6,7,9",
-    "show_samples": true,       
+    "show_samples": true,
+    "binary_class": true,     
 
-    "define_sets_manually": true,
     "c2_or_c3": "ivoct_both_c2/",       
     "cart_or_pol": "orig",
     

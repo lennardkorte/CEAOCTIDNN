@@ -14,5 +14,6 @@
     "learning_rate": 5e-5,
     "scheduler_gamma": 0.85,
     "weight_decay": 0.01,
-    "dropout": 0.2
+    "dropout": 0.2,
+    "preload": false
 }
