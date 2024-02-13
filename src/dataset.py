@@ -1,47 +1,51 @@
-
 import numpy as np
 from torch.utils.data import Dataset
 import h5py
-import time
-import sys
 from da_techniques import DataAugmentationTechniques
-from torchvision import transforms as T
+from tqdm import tqdm
+from PIL import Image
 
-class IVOCT_Dataset(Dataset):
-    def __init__(self, ind_set:list, label_data, all_files_paths, config, for_train=False):
+class OCT_Dataset(Dataset):
+    def __init__(self, ind_set:list, label_data:np.ndarray, all_files_paths, config, for_train):
         self.for_train = for_train
-        self.indices = ind_set
         self.preload = config['preload']
+        self.length = len(ind_set)
+
+        self.chosen_file_paths = [all_files_paths[i] for i in ind_set]
+        self.chosen_labels = label_data[ind_set].astype(np.float32)
         self.transformations_chosen = config['transformations_chosen']
-        self.datasets = [h5py.File(path, 'r')['raw'] for path in all_files_paths]
-        self.label_data = label_data
-        
+
+        self.chosen_images = []
         if self.preload:
-            start_time_preload = time.time()
-            self.input_data = {}
-            for p, dset in enumerate(self.datasets):
-                self.input_data[p] = np.squeeze(dset[:])
-                if p % 200 == 0:
-                    print("Pre-Load Data:", p, "/", len(self.datasets), '- Preload Duration: ', round(time.time() - start_time_preload, 1), 'seconds', end="\r")
-        
-            sys.stdout.write("\033[K")
-            
-        self.length = len(self.indices)
+            for path in tqdm(self.chosen_file_paths, total=len(ind_set), ncols=75, desc="Preloading files..."):
+                self.chosen_images.append(self._load_image(path))
+
+    def _load_image(self, image_file_path):
+        """Load and preprocess an image from a given path."""
+        if image_file_path.endswith('.jpeg') or image_file_path.endswith('.jpg'):
+            with Image.open(image_file_path) as img:
+                img = img.convert('L')  # Convert to grayscale if not already
+                image = np.array(img)
+        else:
+            with h5py.File(image_file_path, 'r') as h5_file:
+                image = np.squeeze(h5_file['raw'][:])
+
+        assert image.ndim == 2, "Image does not have only two dimensions"
+
+        return image
 
     def __len__(self):
         return self.length
     
-    def __getitem__(self, idx):
-        # index of current sample
-        elem_idx = int(self.indices[idx])
-        
-        # Get the Input Data
+    def __getitem__(self, idx):        
+        # Get the input data
         if self.preload:
-            image = self.input_data[elem_idx]
+            image = self.chosen_images[idx]
         else:
-            image = self.datasets[elem_idx][:]
+            image = self._load_image(self.chosen_file_paths[idx])
 
         image_tensor = DataAugmentationTechniques.transform_image(image, self.transformations_chosen, self.for_train)
-        label = self.label_data[elem_idx].astype(np.float32)
+        
+        label = self.chosen_labels[idx]
         
         return image_tensor, label
