@@ -35,10 +35,6 @@ class Logger(object):
             self.stdout.flush()
         
     @staticmethod
-    def print_section_line():
-        print('\n--------------------------------------------------------')
-        
-    @staticmethod
     def printer(title, config, eval_test, if_val_or_test = False):
         print('\n' + title)
         print("   Loss:          ", round(eval_test.mean_loss, config['early_stop_accuracy']))
