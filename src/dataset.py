@@ -1,19 +1,21 @@
 import numpy as np
 from torch.utils.data import Dataset
 import h5py
-from da_techniques import DataAugmentationTechniques
+from image_transforms import ImageTransforms
 from tqdm import tqdm
 from PIL import Image
 
 class OCT_Dataset(Dataset):
-    def __init__(self, ind_set:list, label_data:np.ndarray, all_files_paths, config, for_train):
+    def __init__(self, ind_set:list, label_data:np.ndarray, all_files_paths, for_train, preload, dataset_no, transformations_chosen):
         self.for_train = for_train
-        self.preload = config['preload']
+        self.preload = preload
         self.length = len(ind_set)
+        self.dataset_no = dataset_no
 
         self.chosen_file_paths = [all_files_paths[i] for i in ind_set]
+        
         self.chosen_labels = label_data[ind_set].astype(np.float32)
-        self.transformations_chosen = config['transformations_chosen']
+        self.transformations_chosen = transformations_chosen
 
         self.chosen_images = []
         if self.preload:
@@ -29,9 +31,7 @@ class OCT_Dataset(Dataset):
         else:
             with h5py.File(image_file_path, 'r') as h5_file:
                 image = np.squeeze(h5_file['raw'][:])
-
         assert image.ndim == 2, "Image does not have only two dimensions"
-
         return image
 
     def __len__(self):
@@ -44,7 +44,7 @@ class OCT_Dataset(Dataset):
         else:
             image = self._load_image(self.chosen_file_paths[idx])
 
-        image_tensor = DataAugmentationTechniques.transform_image(image, self.transformations_chosen, self.for_train)
+        image_tensor = ImageTransforms.transform_image(image, self.transformations_chosen, self.for_train, self.dataset_no)
         
         label = self.chosen_labels[idx]
         
