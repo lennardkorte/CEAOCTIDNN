@@ -884,9 +884,9 @@ class CircularMask(object):
 Concatenation
 --------------------------------------------
 '''
-class DataAugmentationTechniques():
+class ImageTransforms():
     @classmethod
-    def compose_transforms(cls, image:np, transforms_ind_chosen:list, for_train:bool):
+    def compose_transforms(cls, image:np, transforms_ind_chosen:list, for_train:bool, dataset_no:int):
         transforms_ind_chosen = transforms_ind_chosen if for_train else []
         
         # Set output shape according to selected transformations
@@ -985,7 +985,7 @@ class DataAugmentationTechniques():
         ]
         pre_transforms = [
             
-            #CLAHE(),
+            #CLAHE(), #TODO
             #AddGaussianNoise2(),
             
             #CartToPolar(radius=112),
@@ -1008,8 +1008,8 @@ class DataAugmentationTechniques():
             T.Resize(size=output_shape, antialias=True),
             #AddGaussianNoise(0, 5000),
             #AddDoubleZeroPadding(),
-            CircularMask(),
-            CircularMask(0.17, True),
+            #CircularMask(), #TODO
+            #CircularMask(0.17, True), #TODO
             ThreeChannelCopy(),
             #Standardization_IN(),
             
@@ -1022,11 +1022,17 @@ class DataAugmentationTechniques():
         if for_train:
             all_transforms = da_before_pre_transform + pre_transforms + transforms_chosen + after_da + post_transforms
         
+        match dataset_no:
+            case 1:
+                print("ok")
+            case 2:
+                all_transforms = pre_transforms + post_transforms
+
         composed_transforms = T.Compose(all_transforms)
         return composed_transforms
         
     @classmethod
-    def transform_image(cls, image:np.ndarray, transforms_ind_chosen:list, for_train:bool):
-        composed_transforms = cls.compose_transforms(image, transforms_ind_chosen, for_train)
+    def transform_image(cls, image:np.ndarray, transforms_ind_chosen:list, for_train:bool, dataset_no:int):
+        composed_transforms = cls.compose_transforms(image, transforms_ind_chosen, for_train, dataset_no)
         transformed_image = composed_transforms(image)
         return transformed_image
