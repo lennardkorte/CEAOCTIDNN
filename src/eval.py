@@ -8,7 +8,7 @@ from pathlib import Path
 import os
 from PIL import Image
 from torchvision.transforms import ToPILImage
-from da_techniques import CircularMask
+from image_transforms import CircularMask
 from scipy.stats import linregress
 
 from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve

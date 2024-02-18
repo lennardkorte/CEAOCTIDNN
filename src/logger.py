@@ -3,31 +3,7 @@ import sys
 import json
 import numpy as np
 
-class Logger(object):
-    def __enter__(self):    
-        self.stdout = sys.stdout
-        sys.stdout = self
-        return self
-    
-    def __exit__(self, exception_type, exception_value, traceback):
-        sys.stdout = self.stdout
-        self.file.close()
-    
-    def __init__(self, file_name, mode, terminal=True):
-        self.terminal = terminal
-        self.file = open(file_name, mode)
-        
-    def write(self, data):
-        if data != '\n':
-            self.file.write(data)
-        if self.terminal:
-            self.stdout.write(data)
-        
-    def flush(self):
-        self.file.flush()
-        if self.terminal:
-            self.stdout.flush()
-        
+class Logger(object):        
     @staticmethod
     def printer(title, config, eval_test, if_val_or_test = False):
         print('\n' + title)
