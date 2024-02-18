@@ -5,15 +5,16 @@
     "name": "run_05",
     "show_samples": true,
     "overwrite_run": true,
-    "data_augmentation": "6,7,9",
+    "data_augmentation": "",
     "overwrite_configurations": true,
     "enable_wandb": false,
-    "epochs": 10,
+    "epochs": 50,
     "num_cv": 4,
     "early_stop_patience": 200,
-    "learning_rate": 5e-5,
-    "scheduler_gamma": 0.85,
+    "learning_rate": 1e-6,
+    "scheduler_gamma": 0.97,
     "weight_decay": 0.01,
-    "dropout": 0.2,
-    "preload": false
+    "dropout": 0.3,
+    "preload": false,
+    "dataset_no": 2
 }
