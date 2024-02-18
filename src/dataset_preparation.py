@@ -48,13 +48,11 @@ class DatasetPreparation():
 
                 # Calculate the number of entries to remove
                 total_entries = len(groups)
-                entries_to_remove = int(total_entries * 0.7)
+                entries_to_remove = int(total_entries * 0.5)
                 # Remove the calculated number of entries from the dictionary
-                keys_to_remove = list(groups.keys())[:entries_to_remove]
+                keys_to_remove = random.sample(list(groups.keys()), entries_to_remove)
                 for key in keys_to_remove:
                     del groups[key]
-
-                
 
                 group_sizes = [len(group) for group in groups.values()]
                 upper_limit = statistics.mean(group_sizes) + statistics.stdev(group_sizes)

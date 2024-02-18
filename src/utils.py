@@ -7,6 +7,7 @@ import json
 
 import numpy as np
 import torch.nn as nn
+from tqdm import tqdm
 
 from pathlib import Path
 from collections import OrderedDict
@@ -78,10 +79,7 @@ class Utils():
         learning_rate_sum = 0
         loss_sum = 0
 
-        num_batches = len(Dataloaders.trainInd)
-        print('Training', num_batches, 'batches.')
-
-        for j, (inputs, labels) in enumerate(Dataloaders.trainInd):
+        for j, (inputs, labels) in tqdm(enumerate(Dataloaders.training), total=len(Dataloaders.training), desc='Batches', leave=False):
             
             inputs = inputs.to(device)
             labels = labels.squeeze().type(torch.LongTensor).to(device)
@@ -138,8 +136,8 @@ class Utils():
         with file_name.open('wt') as handle:
             json.dump(content, handle, indent=4, sort_keys=False)
 
-def data_loader_sampling(cust_data, path_cv, transf_chosen, dataset_no, sample_no):
-    os.makedirs(path_cv / 'sample_images', exist_ok=True)
+def data_loader_sampling(cust_data, path, transf_chosen, dataset_no, sample_no):
+    os.makedirs(path / 'sample_images', exist_ok=True)
     sample_ind = random.sample(range(len(cust_data.label_data)), sample_no)
     
     dataset_prepro = OCT_Dataset(sample_ind, cust_data.label_data, cust_data.all_files_paths, False, False, dataset_no, transf_chosen)
@@ -152,10 +150,9 @@ def data_loader_sampling(cust_data, path_cv, transf_chosen, dataset_no, sample_n
         image_prepro_rescaled = image_prepro
         image_prepro_and_aug_rescaled = image_prepro_and_aug
         
-        save_image(image_prepro_rescaled, path_cv / f'sample_images/prepro_{i}.png')
-        save_image(image_prepro_and_aug_rescaled, path_cv / f'sample_images/prepro_and_aug_{i}.png')
+        save_image(image_prepro_rescaled, path / f'sample_images/prepro_{i+1}.png')
+        save_image(image_prepro_and_aug_rescaled, path / f'sample_images/prepro_and_aug_{i+1}.png')
 
-    exit()
 
 
     

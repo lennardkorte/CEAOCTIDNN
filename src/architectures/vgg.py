@@ -1,6 +1,11 @@
+import sys
 import torch
 import torch.nn as nn
-from . import resnet
+from pathlib import Path
+script_directory = Path(__file__).parent.resolve()
+if str(script_directory) not in sys.path:
+    sys.path.append(str(script_directory))
+import resnet
 
 def get_configs(arch):
 
@@ -293,6 +298,10 @@ if __name__ == "__main__":
     autenc = VGGAutoEncoder(layer_cfg=layer_cfg, mirror=False, freeze_enc=True, depth=5)
     output = autenc(input)
     print(output.shape)
+
+    model = VGG(layer_cfg, num_classes=2, dropout=0.0, img_size=input.shape[-1])
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('Number of Training Parameters', pytorch_total_params)
 
     #from torchsummary import summary
     #summary(encoder)

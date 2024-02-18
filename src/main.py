@@ -1,11 +1,12 @@
 import os
+import csv
 import copy
-import time
 import torch
 import argparse
 import numpy as np
 
 from eval import Eval
+from tqdm import tqdm
 from utils import Utils, data_loader_sampling
 from config import Config
 from logger import Logger
@@ -21,6 +22,9 @@ FILE_NAME_TEST_RESULTS_AVERAGE = 'test_results_average.json'
 def train_and_eval(config:Config):
 
     cust_data = DatasetPreparation(config)
+    if config['show_samples']:
+        data_loader_sampling(cust_data, config.save_path, config['transformations_chosen'], config["dataset_no"], config['sample_no'])
+
     Dataloaders.setup_data_loader_testset(cust_data, config)
     
     device = Utils.config_torch_and_cuda(config)
@@ -45,47 +49,30 @@ def train_and_eval(config:Config):
         cv_labels = cust_data.label_data[train_ind_for_cv]
         class_weights_tensor = torch.tensor(compute_class_weight(class_weight='balanced', classes=np.unique(cv_labels), y=cv_labels), dtype=torch.float)
 
-        if config['show_samples']:
-            data_loader_sampling(cust_data, save_path_cv, config['transformations_chosen'], config["dataset_no"], config['sample_no'])
-
-        if cv_done:
-            print('Skipped CV number:', cv+1, '(already trained)')
-        else:
-            print('Start CV number:', cv+1, '\n')
-            print("\nTrain iterations / batches per epoch: ", int(len(Dataloaders.trainInd)))
-            
+        if not cv_done:
             checkpoint = Checkpoint('checkpoint_last', save_path_cv, device, config, cv + 1)
-            
-            pytorch_total_params = sum(p.numel() for p in checkpoint.model.parameters() if p.requires_grad)
-            print('Number of Training Parameters', pytorch_total_params)
             
             if config["enable_wandb"]:
                 Wandb.init(cv, checkpoint.wandb_id, config)
-
-            start_time = time.time()
             
-            print("\n Training...")
             early_stop = False
             es_counter = 0
             
-            for epoch in range(checkpoint.start_epoch, config['epochs']+1):
+            for epoch in tqdm(range(checkpoint.start_epoch, config['epochs']+1), total=config['epochs'], desc=f'Training epochs (CV {cv+1})'):
                 if early_stop:
                     break
                 
                 duration_epoch = Utils.train_one_epoch(checkpoint.model, device, checkpoint.scaler, checkpoint.optimizer, config, class_weights_tensor)
                 checkpoint.scheduler.step()
-
-                print('Evaluating epoch...')
-                duration_cv = time.time() - start_time
                 
-                eval_valid = Eval(Dataloaders.valInd, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name='checkpoint_valid', class_weights=class_weights_tensor)
+                eval_valid = Eval(Dataloaders.validation, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name='checkpoint_valid', class_weights=class_weights_tensor)
                 checkpoint.update_eval_valid(eval_valid, config)
                 
                 if config["enable_wandb"]:
                     Wandb.wandb_log(eval_valid, cust_data.label_classes, epoch, checkpoint.optimizer, 'Validation Set', config)
 
                 if config['calc_train_error']:
-                    eval_train = Eval(Dataloaders.trainInd_eval, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights_tensor)
+                    eval_train = Eval(Dataloaders.training_eval, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights_tensor)
                     if config["enable_wandb"]:
                         Wandb.wandb_log(eval_train, None, 0, None, 'Train Set Peak', config, False)
 
@@ -117,14 +104,13 @@ def train_and_eval(config:Config):
                         Wandb.wandb_log(checkpoint.eval_valid, cust_data.label_classes, epoch, 'b-Validation', config, False)
 
                     if config['calc_and_peak_test_error']:
-                        eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights_tensor)
+                        eval_test = Eval(Dataloaders.test, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights_tensor)
                         if config["enable_wandb"]:
                             Wandb.wandb_log(eval_test, None, 0, None, 'Testset Error', config, False)
                         
                 else:
                     es_counter += 1
                     
-                print('improvement_identified:', improvement_identified)
                 if not config["auto_encoder"]:
                     print('no_overfitting:', no_overfitting)
 
@@ -135,36 +121,41 @@ def train_and_eval(config:Config):
                 checkpoint.save_checkpoint('checkpoint_last', epoch, save_path_cv, config)
                 if epoch != 1:
                     Checkpoint.delete_checkpoint('checkpoint_last', epoch - 1, save_path_cv)
-                
-                # Print epoch results
-                np.set_printoptions(precision=4)
-                print('')
-                print('Name:          ', config['name'])
-                print('Fold:          ', cv+1, '/', config['num_cv'])
-                print('Epoch:         ', epoch, '/', config['epochs'])
-                print('Duration Epoch:', str(round(duration_epoch, 2)) + 's')
-                
-                print('\nCross-fold Validation information:')
-                print('Training time:  %dh %dm %ds' % (int(duration_cv / 3600), int(np.mod(duration_cv, 3600) / 60), int(np.mod(np.mod(duration_cv, 3600), 60))))
-                print(time.strftime('Current Time:   %d.%m. %H:%M:%S', time.localtime()))
-                print('Loss ValInd:   ', round(checkpoint.eval_valid.mean_loss, config['early_stop_accuracy']))
-                if not config["auto_encoder"]:
-                    print('Best MCC: ', round(validation_best_metrics_current_cv[5], config['early_stop_accuracy']), 'at Epoch', last_best_epoch_current_cv)
+
+                csv_file_path = f'log_cv_{cv+1}.csv'
+                with open(csv_file_path, 'a', newline='') as csvfile:
+                    entries_dict = {
+                        "Epoch": epoch,
+                        "duration": duration_epoch,
+                        "overfitting": not no_overfitting
+                    }
+                    if not config["auto_encoder"]:
+                        entries_dict.update(new_entries = {
+                            'best_epoch': last_best_epoch_current_cv,
+                            'best_mcc': round(validation_best_metrics_current_cv[5], config['early_stop_accuracy']),
+                            'improvement_identified': improvement_identified })
+                    for key, value in checkpoint.eval_valid.metrics: #"valid_loss": round(checkpoint.eval_valid.mean_loss, config['early_stop_accuracy'])
+                        entries_dict[key] = value
+                        
+                    writer = csv.DictWriter(csvfile, fieldnames=entries_dict.keys())
+                    csvfile.seek(0, 2)
+                    if csvfile.tell() == 0: writer.writeheader()
+                    writer.writerow(entries_dict)
                 
                 Logger.printer('Validation Metrics (tests on validation set):', config, checkpoint.eval_valid)
+                
                 if config['peak_train_error']:
                     Logger.printer('Training Metrics (tests on training set mod 2):', config, eval_train)
 
                 if config['calc_and_peak_test_error']:
                     Logger.printer('Testing Metrics (tests on testing set):', config, eval_test)
 
-        print('Testing performance with testset on:')
         for checkpoint_name in ['checkpoint_last', 'checkpoint_best']:
             checkpoint = Checkpoint(checkpoint_name, save_path_cv, device, config, cv + 1)
             if config["enable_wandb"] and 'WANDB_API_KEY' not in os.environ:
                 Wandb.init(cv, checkpoint.wandb_id, config)
                 
-            eval_test = Eval(Dataloaders.testInd, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name=checkpoint_name, class_weights=class_weights_tensor)
+            eval_test = Eval(Dataloaders.test, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name=checkpoint_name, class_weights=class_weights_tensor)
             Logger.printer(checkpoint_name, config, eval_test, if_val_or_test=True)
             if config["enable_wandb"]:
                 Wandb.wandb_log(eval_test, cust_data.label_classes, 0, checkpoint.optimizer, checkpoint_name, config)

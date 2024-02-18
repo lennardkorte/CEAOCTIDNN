@@ -708,6 +708,10 @@ if __name__ == "__main__":
     output = autenc(input)
     print(output.shape)
 
+    model = ResNet(layer_cfg, version, bottleneck, num_classes=2, dropout=0.0)
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('Number of Training Parameters', pytorch_total_params)
+
     #from torchsummary import summary
     #summary(encoder)
     #summary(decoder)
