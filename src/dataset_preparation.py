@@ -4,14 +4,14 @@ import h5py
 import numpy as np
 import random
 import itertools
-from utils import comp_class_weights
 import statistics
 from collections import defaultdict
+from sklearn.utils.class_weight import compute_class_weight
     
 class DatasetPreparation():
     def __init__(self, config):
         match config['dataset_no']:
-            case 0:
+            case 1:
                 # Get File and Directory Paths
                 self.all_files_paths = []
                 for dirpath, _, filenames in os.walk('./data/datasets/001/h5s/original/' + config['c2_or_c3'] + config['cart_or_pol'] + '/'):
@@ -36,15 +36,25 @@ class DatasetPreparation():
                 
                 self.test_ind, self.train_ind_subdivision = self._set_test_set_manually_ds1(config)
 
-            case 1:
+            case 2:
                 self.label_classes = ["NORMAL", "CNV", "DME", "DRUSEN"]
             
                 groups = defaultdict(set)
-                for root, dirs, files in os.walk('./data/datasets/002/dataset_unzipped/CellData/OCT/'):
+                for root, dirs, files in os.walk('./data/datasets/002/dataset_v2_unzipped/'):
                     for file in files:
                         if file.endswith(('.jpeg', '.jpg')):
                             full_path = os.path.join(root, file)
                             groups[self._extract_group_name(full_path)].add(full_path)
+
+                # Calculate the number of entries to remove
+                total_entries = len(groups)
+                entries_to_remove = int(total_entries * 0.7)
+                # Remove the calculated number of entries from the dictionary
+                keys_to_remove = list(groups.keys())[:entries_to_remove]
+                for key in keys_to_remove:
+                    del groups[key]
+
+                
 
                 group_sizes = [len(group) for group in groups.values()]
                 upper_limit = statistics.mean(group_sizes) + statistics.stdev(group_sizes)
@@ -52,8 +62,8 @@ class DatasetPreparation():
                 sorted_groups = sorted(groups.values(), key=len, reverse=True)
                 subsets = [[] for _ in range(config['num_cv']+1)]
                 self.all_files_paths = []
-                self.label_data = []
-                for group in sorted_groups.values():
+                self.label_data = np.array([])
+                for group in sorted_groups:
                     group_sample = random.sample(group, min(len(group), int(upper_limit)))
                     starting_index = len(self.all_files_paths)
                     self.all_files_paths.extend(group_sample)
@@ -61,19 +71,24 @@ class DatasetPreparation():
                     subset_with_min_length = min(subsets, key=len)
                     subset_with_min_length.extend(new_element_indices)
                     new_labels = [self.label_classes.index(os.path.basename(os.path.dirname(value))) for value in group_sample]
-                    self.label_data.extend(new_labels)
+                    self.label_data = np.concatenate((self.label_data, np.array(new_labels)))
 
+                self.subsets = subsets.copy()
                 self.test_ind = subsets.pop()
                 self.train_ind_subdivision = subsets
 
                 if config['binary_class']:
-                    self.label_data = [0 if x == 0 else 1 for x in self.label_data]
-
-                comp_class_weights(self.label_data)
-                exit()
+                    self.label_data = np.where(self.label_data == 0, 0, 1)
 
             case idx:
                 raise AssertionError(f"Dataset with index {idx} not implemented.")
+
+        print("class_weights (last is test set):")
+        for i, cv_indices in enumerate(self.subsets):
+            cv_labels = self.label_data[cv_indices]
+            classes, counts = np.unique(cv_labels, return_counts=True)
+            class_weights_comp = compute_class_weight(class_weight='balanced', classes=classes, y=cv_labels)
+            print(f' subset {i+1}:', 'classes:', classes, 'counts:', counts, 'class weights:', class_weights_comp)
     
     @staticmethod
     def _extract_group_name(file_path):
@@ -163,13 +178,12 @@ class DatasetPreparation():
             num_labels_total = sum(len(sublist) for sublist in train_ind_subdivision)
         print(num_labels_total, num_pos_labels_total/num_labels_total)  
 
-        test_ind = train_ind_subdivision.pop(1)      
+        self.subsets = train_ind_subdivision.copy()
+        test_ind = train_ind_subdivision.pop()      
         
         all_labels = []
         for subset in train_ind_subdivision:
             all_labels.extend(self.label_data[subset])
         # Determine and list all classes, counts and class-weights
-            
-        comp_class_weights(all_labels)
                     
         return test_ind, train_ind_subdivision
