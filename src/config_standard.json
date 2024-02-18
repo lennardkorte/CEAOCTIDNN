@@ -6,7 +6,8 @@
     "overwrite_configurations": false,
     "gpu": 0,
 
-    "dataset_no": 0,
+    "dataset_no": 1,
+    "sample_no": 10,
     
     "use_cuda": true,
     "deterministic_training": true,
@@ -20,7 +21,7 @@
     "optimizer": "Adam",
     "weight_decay": 0.01,
     "momentum": 0.9,
-    "dropout": 0.2,
+    "dropout": 0.3,
 
     "MCdropout_test": false,
 
@@ -28,7 +29,7 @@
     "set_percentage_val": 20,           
 
     "preload": false,
-    "batch_size": 128,
+    "batch_size": 8,
     
     "enable_wandb": true,
     "wb_project": "new_project",
@@ -39,11 +40,11 @@
     "calc_and_peak_test_error": false,
     
     "trainandtest": true,
-    "num_cv": 7,                        
+    "num_cv": 4,                        
     "epochs": 50,                      
     "learning_rate": 3e-6,
     "scheduler_step_size": 1,
-    "scheduler_gamma": 0.8,
+    "scheduler_gamma": 0.97,
     
     "early_stop_patience": 25,           
     "early_stop_accuracy": 7,          
