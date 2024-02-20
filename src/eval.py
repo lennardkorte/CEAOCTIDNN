@@ -19,194 +19,229 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_s
 class Eval():
     def __init__(self, dataloader, device, model, config, save_path_cv, cv, checkpoint_name=None, class_weights=None):
         model.eval()
-        mc_iterator = range(1)
 
-        mc_dropout_test = config['MCdropout_test'] and checkpoint_name is not None
-        if mc_dropout_test:
-            loss_linear_all_list = []
-            mc_iterator = tqdm(range(config['n_points']), total=config['n_points'], desc='MC Confidence Estimation')
-
-        for _ in mc_iterator:
-            for i, (inputs, labels) in tqdm(enumerate(dataloader), total=len(dataloader), desc='Evaluation (train peak & valid)', leave=False):
-                inputs = inputs.to(device)
-                labels_long = labels.type(torch.LongTensor).to(device)
-                labels = labels.to(device)
-                
-                with torch.set_grad_enabled(False):
-                    with torch.cuda.amp.autocast():
-                        
-                        if mc_dropout_test:
-                            for m in model.modules():
-                                if m.__class__.__name__.startswith('Dropout'):
-                                    m.train()
-
-                        outputs = model(inputs)
-                        
-                        if config["auto_encoder"]:
-                            mse_loss_function = nn.MSELoss(reduction='none')
-                            loss_elementwise = mse_loss_function(outputs, inputs)
-                            loss_each = torch.mean(loss_elementwise, dim=[1,2,3]) # loss_each is loss for each image in batch (8 floats for batch size 8)
-                            
-                            # Compute Loss without log # TODO: mask for training as well
-                            me_loss_function = nn.L1Loss(reduction='none') # Mean Error
-                            '''
-                            inputs = CircularMask(0.9)(inputs)
-                            inputs = CircularMask(0.17, True)(inputs)
-                            outputs = CircularMask(0.9)(outputs)
-                            outputs = CircularMask(0.17, True)(outputs)'''
-
-                            loss_linear_elementwise = me_loss_function(outputs, inputs)
-                            loss_linear_each = torch.mean(loss_linear_elementwise, dim=[1,2,3])
-                        else:
-                            ce_loss = nn.CrossEntropyLoss(weight=class_weights.to(device), reduction='none') # no weights here
-                            loss_each = ce_loss(outputs, labels_long)
-                            
-                            # cross-entropy loss without log
-                            softmax_function = nn.Softmax(dim=1)
-                            outputs_softmax = softmax_function(outputs)
-                            nllloss_function = nn.NLLLoss(reduction='none')
-                            loss_linear_each = nllloss_function(outputs_softmax, labels_long)
-                    
-                if i == 0:
-                    loss_all_tensor = loss_each
-                    loss_linear_all_tensor = loss_linear_each
-                    targets_all_tensor = labels_long
-                    predictions_all_tensor = outputs
-                    inputs_all_tensor = inputs
-                        
-                else:
-                    loss_all_tensor = torch.cat([loss_all_tensor, loss_each], 0)
-                    loss_linear_all_tensor = torch.cat([loss_linear_all_tensor, loss_linear_each], 0)
-                    targets_all_tensor = torch.cat([targets_all_tensor, labels_long], 0)
-                    predictions_all_tensor = torch.cat([predictions_all_tensor, outputs], 0)
-                    inputs_all_tensor = torch.cat([inputs_all_tensor, inputs], 0)
-                        
-
-            # To numpy arrays
-            loss_all = loss_all_tensor.cpu().numpy()
-            loss_linear_all = loss_linear_all_tensor.cpu().numpy()
-            self.mean_loss = np.mean(loss_all)
-            self.mean_loss_linear = np.mean(loss_linear_all)
-            targets_np = targets_all_tensor.cpu().numpy()
-            predictions_np = predictions_all_tensor.cpu().numpy()
-
+        self.metrics = {}
+        tests = [False]
+        if config['MCdropout_test'] and not config['auto_encoder'] and checkpoint_name is not None:
+            tests.append(True)
+        for mc_dropout_test in tests:
             if mc_dropout_test:
-                loss_linear_all_list.append(loss_linear_all)
-        
-        if mc_dropout_test:
-            # Compute entropy for each index
-            # loss to metrics?
-            # loss for autenc improvement estimation?
-            # average image channels after model
-            
-            losses = np.array(loss_linear_all_list)
-            variances = np.var(losses, axis=0)
-
-            predicted_labels = np.argmax(predictions_np, axis=1)
-            df = pd.DataFrame({'true_labels': targets_np, 'predicted_labels': predicted_labels, 'variance': variances})
-            average_variances = df.groupby(['true_labels', 'predicted_labels'])['variance'].mean().unstack(fill_value=0)
-            average_variances_dict = average_variances.to_dict()
-            with open(save_path_cv / 'average_variances.json', 'w') as f:
-                json.dump(average_variances_dict, f, indent=4)
-            
-            exit()
-
-        if not config["auto_encoder"]:
-            self.metrics = self.calc_metrics(predictions_np, targets_all_tensor, config['num_classes'])
-        
-        if checkpoint_name is not None:
-            if not config["auto_encoder"]:
-                classifier_predictions = np.argmax(predictions_np, 1)
-
-                # Writing integers to the file
-                predictions_file_name = save_path_cv / (checkpoint_name + '_predloss_pairs.txt')
-                with open(predictions_file_name, 'w') as file:
-                    for int_class, float_loss in zip(classifier_predictions,loss_linear_all):
-                        file.write(f"{int_class},{float_loss}\n")
-
+                loss_linear_all_list = []
+                mc_iterator = tqdm(range(config['mc_iterations']), total=config['mc_iterations'], desc='MC Confidence Estimation', leave=False)
             else:
-                self.save_auto_encoder_sample(inputs_all_tensor, predictions_all_tensor, save_path_cv)
-
-                if config['compare_classifier_predictions']:
-
-                    # Load classifier_predictions, classifier_losses for checkpoint_name
-                    save_path_classifier = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
-                    predictions_file_name = save_path_classifier / (checkpoint_name + '_predloss_pairs.txt')
-                    classifier_predloss_pairs = []
-                    with open(predictions_file_name, 'r') as file:
-                        for line in file:
-                            parts = line.strip().split(',')
-                            classifier_predloss_pairs.append((int(parts[0]), float(parts[1])))
-                    classifier_predictions, classifier_losses = tuple(map(list, zip(*classifier_predloss_pairs)))
+                mc_iterator = range(1)
+            for _ in mc_iterator:
+                for i, (inputs, labels) in tqdm(enumerate(dataloader), total=len(dataloader), desc=f'MC Evaluation' if mc_dropout_test else 'Evaluation', leave=False):
+                    inputs = inputs.to(device)
+                    labels_long = labels.type(torch.LongTensor).to(device)
+                    labels = labels.to(device)
                     
-                    self.mse_loss_conf_matr_mean = self.calc_mse_loss_conf_matr_mean(loss_linear_all, targets_np, classifier_predictions)
+                    with torch.set_grad_enabled(False):
+                        with torch.cuda.amp.autocast():
+                            
+                            if mc_dropout_test:
+                                for m in model.modules():
+                                    if m.__class__.__name__.startswith('Dropout'):
+                                        m.train()
 
-                    # Apply Threshold
-                    classifier_losses = np.array(classifier_losses)
-                    mask1 = np.array([elem > -1 for elem in classifier_losses])
-                    mask2 = np.array([elem > -10.0 for elem in loss_linear_all])
-                    classifier_losses_threshold = classifier_losses[mask1 & mask2]
-                    loss_linear_all_threshold = loss_linear_all[mask1 & mask2]
+                            outputs = model(inputs)
+                            
+                            if config["auto_encoder"]:
+                                '''
+                                # Compute Loss without log # TODO: mask for training as well
+                                inputs = CircularMask(0.9)(inputs)
+                                inputs = CircularMask(0.17, True)(inputs)
+                                outputs = CircularMask(0.9)(outputs)
+                                outputs = CircularMask(0.17, True)(outputs)'''
 
-                    # New font sizes for both plots
-                    title_fontsize = 20
-                    axis_label_fontsize = 20
-                    tick_label_fontsize = 15
+                                me_loss_function = nn.L1Loss(reduction='none') # Mean Error
+                                loss_linear_elementwise = me_loss_function(outputs, inputs)
+                                loss_linear_each = torch.mean(loss_linear_elementwise, dim=[1,2,3])
 
-                    # Create plot Loss Pair Distribution of Classifier vs Autoencoder
-                    colors = np.array([])
-                    for t, p in zip(targets_np, classifier_predictions): #colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_all_tensor, classifier_predictions)])
-                        color = 'green' if t == p else 'red' # TODO: colors not right
-                        colors = np.append(colors, color)
-                    colors_threshold = colors[mask1 & mask2]
-                    plt.clf()
-                    plt.figure(figsize=(10, 6))
+                                if not mc_dropout_test:
+                                    mse_loss_function = nn.MSELoss(reduction='none')
+                                    loss_elementwise = mse_loss_function(outputs, inputs)
+                                    loss_each = torch.mean(loss_elementwise, dim=[1,2,3]) # loss_each is loss for each image in batch (8 floats for batch size 8)
+                            else:
+                                # cross-entropy loss without log
+                                softmax_function = nn.Softmax(dim=1)
+                                outputs_softmax = softmax_function(outputs)
+                                nllloss_function = nn.NLLLoss(reduction='none')
+                                loss_linear_each = nllloss_function(outputs_softmax, labels_long)
 
-                    x = loss_linear_all_threshold
-                    y = classifier_losses_threshold
-                    slope, intercept, r_value, p_value, std_err = linregress(x, y)
-                    line = slope * x + intercept
-                    pearson_coefficient = r_value
-                    print("slope: ", slope)
-                    print("pearson_coefficient: ", pearson_coefficient)
+                                if not mc_dropout_test:
+                                    ce_loss = nn.CrossEntropyLoss(weight=class_weights.to(device), reduction='none') # no weights here
+                                    loss_each = ce_loss(outputs, labels_long)
+                        
+                    if i == 0:
+                        loss_linear_all_tensor = loss_linear_each
+                        if not mc_dropout_test:
+                            loss_all_tensor = loss_each
+                            targets_all_tensor = labels_long
+                            predictions_all_tensor = outputs
+                            inputs_all_tensor = inputs
+                            
+                    else:
+                        loss_linear_all_tensor = torch.cat([loss_linear_all_tensor, loss_linear_each], 0)
+                        if not mc_dropout_test:
+                            loss_all_tensor = torch.cat([loss_all_tensor, loss_each], 0)
+                            targets_all_tensor = torch.cat([targets_all_tensor, labels_long], 0)
+                            predictions_all_tensor = torch.cat([predictions_all_tensor, outputs], 0)
+                            inputs_all_tensor = torch.cat([inputs_all_tensor, inputs], 0)
+                            
+                # Transform to numpy arrays
+                loss_linear_all = loss_linear_all_tensor.cpu().numpy()
+                
+                #mean_loss_linear = np.mean(loss_linear_all)
+                if mc_dropout_test:
+                    loss_linear_all_list.append(loss_linear_all)
+                else:
+                    loss_all = loss_all_tensor.cpu().numpy()
+                    mean_loss = np.mean(loss_all)
+                    self.metrics['loss'] = mean_loss
+                    targets_np = targets_all_tensor.cpu().numpy()
+                    if not config['auto_encoder']:
+                        predictions_np = predictions_all_tensor.cpu().numpy()
 
-                    plt.scatter(loss_linear_all_threshold, classifier_losses_threshold, alpha=0.5, c=colors_threshold)
-                    plt.plot(x, line, color='blue', label='Linear Regression Line')
-                    #plt.title('Loss Pair Distribution of Classifier vs Autoencoder', fontsize=title_fontsize)
-                    plt.xlabel('x', fontsize=axis_label_fontsize)
-                    plt.ylabel('y', fontsize=axis_label_fontsize)
-                    plt.xticks(fontsize=tick_label_fontsize)  # Larger x-axis tick labels
-                    plt.yticks(fontsize=tick_label_fontsize)  # Larger y-axis tick labels
-                    plt.grid(True)
-                    plt.subplots_adjust(left=0.10, right=0.99, top=0.99, bottom=0.1)
-                    plt.savefig(save_path_cv / (checkpoint_name + '_loss_distribution_plot.png'))
-                    plt.close()
+            if not config["auto_encoder"] and not mc_dropout_test:
+                self.metrics.update(self.calc_metrics(predictions_np, targets_all_tensor))
+                
+            if checkpoint_name is not None: # only given when testing best and last checkpoint
+                if not config["auto_encoder"]:
+                    classifier_predictions = np.argmax(predictions_np, 1)
+                    if mc_dropout_test:
+                        # determinist randomness                        
+                        losses = np.array(loss_linear_all_list)
+                        variances = np.var(losses, axis=0)
+                        self.uncertainty_confusion_matrix(variances, predictions_np, targets_np, save_path_cv / (checkpoint_name + '_avg_var.json'))
+                        self.loss_distribution_analysis(variances, loss_linear_all, classifier_predictions, targets_np, save_path_cv, checkpoint_name + '_' + 'variance')
+                    else:
+                        predictions_file_name = save_path_cv / (checkpoint_name + '_predloss_pairs.txt')
+                        with open(predictions_file_name, 'w') as file:
+                            for int_class, float_loss in zip(classifier_predictions,loss_linear_all):
+                                file.write(f"{int_class},{float_loss}\n")
 
-                    # Create plot with Proportion of Samples with Lowest MAE
-                    loss_linear_all_asc, classifier_losses_asc = zip(*sorted(zip(loss_linear_all_threshold, classifier_losses_threshold), key=lambda x: x[0]))
-                    loss_linear_all_asc = list(loss_linear_all_asc)
-                    classifier_losses_asc = list(classifier_losses_asc)
-                    proportions = np.linspace(0.01, 1, 100)  # 100 proportions from 1% to 100%
-                    average_losses = [] # average_losses contains the average classifier loss for each proportion
-                    for proportion in proportions:
-                        n_samples = int(proportion * len(classifier_losses_asc))
-                        selected_losses = classifier_losses_asc[:n_samples]
-                        average_loss = np.mean(selected_losses)
-                        average_losses.append(average_loss)
-                    plt.clf()
-                    plt.figure(figsize=(10, 6))
-                    plt.plot(proportions, average_losses)
-                    plt.xlabel('x', fontsize=axis_label_fontsize)
-                    plt.ylabel('y', fontsize=axis_label_fontsize)
-                    plt.xticks(fontsize=tick_label_fontsize)  # Larger x-axis tick labels
-                    plt.yticks(fontsize=tick_label_fontsize)  # Larger y-axis tick labels
-                    #plt.title('Relationship between MAE and Classifier Loss', fontsize=title_fontsize)
-                    plt.grid(True)
-                    plt.subplots_adjust(left=0.10, right=0.99, top=0.99, bottom=0.1)
-                    plt.savefig(save_path_cv / (checkpoint_name + '_risk_coverage_curve.png'))
-                    plt.close()
+                else:
+                    self.save_auto_encoder_sample(inputs_all_tensor, predictions_all_tensor, save_path_cv)
+                    if config['compare_classifier_predictions']:
+                        save_path_classifier = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
+                        predictions_file_name = save_path_classifier / (checkpoint_name + '_predloss_pairs.txt')
+                        classifier_predloss_pairs = []
+                        with open(predictions_file_name, 'r') as file:
+                            for line in file:
+                                parts = line.strip().split(',')
+                                classifier_predloss_pairs.append((int(parts[0]), float(parts[1])))
+                        classifier_predictions, classifier_losses = tuple(map(list, zip(*classifier_predloss_pairs)))
+                        
+                        self.uncertainty_confusion_matrix(loss_linear_all, classifier_predictions, targets_np, save_path_cv / (checkpoint_name + '_avg_autenc_loss.json'))
+                        self.loss_distribution_analysis(loss_linear_all, classifier_losses, classifier_predictions, targets_np, save_path_cv, checkpoint_name + '_' + 'CEB_loss')
 
-    def save_auto_encoder_sample(self, inputs_all_tensor, predictions_all_tensor, save_path_cv):
+    @staticmethod
+    def uncertainty_confusion_matrix(uncertainty_indicator, predictions, targets, path):
+        predicted_labels = np.argmax(predictions, axis=1)
+        df = pd.DataFrame({'true_labels': targets, 'predicted_labels': predicted_labels, 'variance': uncertainty_indicator})
+        average_variances = df.groupby(['true_labels', 'predicted_labels'])['variance'].mean().unstack(fill_value=0)
+        average_variances_dict = average_variances.to_dict()
+        with open(path, 'w') as f:
+            json.dump(average_variances_dict, f, indent=4)
+
+    @staticmethod
+    def loss_distribution_analysis(ue_values, classifier_losses, classifier_predictions, targets_np, save_path_cv, store_name):
+            # Apply Threshold
+            classifier_losses = np.array(classifier_losses)
+            #mask1 = np.array([elem > -1 for elem in classifier_losses])
+            #mask2 = np.array([elem > -10.0 for elem in ue_values])
+            mask1 = np.array([True for elem in classifier_losses])
+            mask2 = np.array([True for elem in ue_values])
+            classifier_losses_threshold = classifier_losses[mask1 & mask2]
+            ue_values_threshold = ue_values[mask1 & mask2]
+
+            # Create plot Loss Pair Distribution of Classifier vs Autoencoder
+            colors = np.array([])
+            for t, p in zip(targets_np, classifier_predictions): #colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_all_tensor, classifier_predictions)])
+                color = 'green' if t == p else 'red' # TODO: colors not right
+                colors = np.append(colors, color)
+            colors_threshold = colors[mask1 & mask2]
+
+            x = ue_values_threshold
+            y = classifier_losses_threshold
+            slope, intercept, r_value, p_value, std_err = linregress(x, y)
+            line = slope * x + intercept
+            pearson_coefficient = r_value
+            print("slope: ", slope)
+            print("pearson_coefficient: ", pearson_coefficient)
+
+            plt.clf()
+            plt.figure(figsize=(10, 6))
+            plt.scatter(ue_values_threshold, classifier_losses_threshold, alpha=0.5, c=colors_threshold)
+            plt.plot(x, line, color='blue', label='Linear Regression Line')
+            plt.xlabel('x', fontsize=20)
+            plt.ylabel('y', fontsize=20)
+            plt.xticks(fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.grid(True)
+            plt.ylim(-1, 0)
+            plt.subplots_adjust(left=0.10, right=0.99, top=0.99, bottom=0.1)
+            plt.savefig(save_path_cv / (store_name + '_distr_plot.png'))
+            plt.close()
+
+            # Create plot with Proportion of Samples with Lowest MAE
+            ue_values_asc, classifier_losses_asc = zip(*sorted(zip(ue_values_threshold, classifier_losses_threshold), key=lambda x: x[0]))
+            ue_values_asc = list(ue_values_asc)
+            classifier_losses_asc = list(classifier_losses_asc)
+            proportions = np.linspace(0.01, 1, 100)  # 100 proportions from 1% to 100%
+            average_losses = [] # average_losses contains the average classifier loss for each proportion
+            for proportion in proportions:
+                n_samples = int(proportion * len(classifier_losses_asc))
+                selected_losses = classifier_losses_asc[:n_samples]
+                average_loss = np.mean(selected_losses)
+                average_losses.append(average_loss)
+            plt.clf()
+            plt.figure(figsize=(10, 6))
+            plt.plot(proportions, average_losses)
+            plt.xlabel('x', fontsize=20)
+            plt.ylabel('y', fontsize=20)
+            plt.xticks(fontsize=15) 
+            plt.yticks(fontsize=15)
+            plt.grid(True)
+            plt.ylim(-1, 0)
+            plt.subplots_adjust(left=0.10, right=0.99, top=0.99, bottom=0.1)
+            plt.savefig(save_path_cv / (store_name + '_risk_cov_curve.png'))
+            plt.close()
+
+            # Initialize lists to store results
+            thresholds = np.arange(0.01, 1.01, 0.01)
+            balanced_accuracies = []
+
+            # Calculate balanced accuracy for different thresholds
+            for threshold in thresholds:
+                mask = ue_values < threshold
+                if np.sum(mask) > 0:  # Ensure there are samples below the threshold
+                    predictions_threshold = classifier_predictions[mask]
+                    targets_threshold = targets_np[mask]
+                    balanced_accuracy = balanced_accuracy_score(targets_threshold, predictions_threshold)
+                else:
+                    balanced_accuracy = None
+                balanced_accuracies.append(balanced_accuracy)
+
+            plt.clf()
+            plt.figure(figsize=(10, 6))
+            plt.figure(figsize=(10, 6))
+            plt.plot(thresholds, balanced_accuracies, marker='o', linestyle='-', color='blue')
+            plt.xlabel('Threshold', fontsize=20)
+            plt.ylabel('Balanced Accuracy', fontsize=20)
+            plt.xlabel('x', fontsize=20)
+            plt.ylabel('y', fontsize=20)
+            plt.xticks(fontsize=15) 
+            plt.yticks(fontsize=15)
+            plt.grid(True)
+            plt.ylim(0, 1)
+            plt.subplots_adjust(left=0.10, right=0.99, top=0.99, bottom=0.12)
+            plt.savefig(save_path_cv / (store_name + '_bacc_thresh.png'))
+            plt.close()
+
+    @staticmethod
+    def save_auto_encoder_sample(inputs_all_tensor, predictions_all_tensor, save_path_cv):
         num_samples = 10
         for i, (input_tensor, prediction_tensor) in enumerate(zip(inputs_all_tensor, predictions_all_tensor)):
             if not i % int(len(predictions_all_tensor) / num_samples):
@@ -252,18 +287,9 @@ class Eval():
                 segmentation_image = Image.fromarray(np.uint8(segmentation_overlay * 255))
                 segmentation_image.save(img_dir / f"{i}_segmentation.png")
                 '''
-
-    def calc_mse_loss_conf_matr_mean(self, loss_linear_all, classifier_targets, classifier_predictions):
-        mse_loss_conf_matr = [[[],[]], [[],[]]]
-        for loss_linear, classifier_target, classifier_prediction in zip(loss_linear_all, classifier_targets, classifier_predictions):
-            mse_loss_conf_matr[int(classifier_prediction)][int(classifier_target)].append(loss_linear)
-
-        # Calculating the mean of each list and storing it in a 2D matrix
-        mse_loss_conf_matr_mean = np.array([[np.mean(lst) for lst in row] for row in mse_loss_conf_matr])
-
-        return mse_loss_conf_matr_mean
     
-    def calc_metrics(self, predictions_np, targets, num_classes):
+    @staticmethod
+    def calc_metrics(predictions_np, targets):
         
         metrics = {
             "bal_acc": 0.0,
