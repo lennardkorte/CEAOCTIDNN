@@ -60,7 +60,7 @@ class Checkpoint():
     
     @classmethod
     def get_new_model(cls, device:device, config:Config, cv:int) -> DataParallel:
-        model = architecture_builder(config['architecture'], config['arch_version'], config['dropout'], config['num_classes'])
+        model = architecture_builder(config['architecture'], config['arch_version'], config['dropout'], config['num_classes'], config['autenc_depth'])
         
         # Load the pretrained ResNet model from a ".pt" file
         save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
