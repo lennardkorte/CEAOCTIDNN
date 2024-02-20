@@ -54,7 +54,7 @@ def train_and_eval(config:Config):
 
                 checkpoint.scheduler.step()
                 
-                eval_valid = Eval(Dataloaders.validation, device, checkpoint.model, config, save_path_cv, cv + 1, checkpoint_name='checkpoint_valid', class_weights=class_weights_tensor)
+                eval_valid = Eval(Dataloaders.validation, device, checkpoint.model, config, save_path_cv, cv + 1, class_weights=class_weights_tensor)
                 Logger.add(eval_valid.metrics, 'val_set')
 
                 if config['calc_train_error']:
