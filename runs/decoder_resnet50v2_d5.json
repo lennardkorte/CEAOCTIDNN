@@ -1,0 +1,20 @@
+
+{
+    "wb_project": "CEAOCTIDNN",
+    "enable_wandb": false,
+    
+    "group": "decoder",
+    "name": "resnet50v2_d5",
+    "overwrite_run": true,
+    
+    "auto_encoder": true,
+    "model_type": "resnet50autenc",
+    "autenc_depth": 5,
+    
+    "encoder_group": "classifier",
+    "encoder_name": "resnet50v2",
+
+    "epochs": 4,
+    "num_cv": 5,
+    "only_x_cv": 1
+}
