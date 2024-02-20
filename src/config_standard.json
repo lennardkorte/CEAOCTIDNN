@@ -17,13 +17,10 @@
     "arch_version": 2.0,
     "pretrained": true,
     "num_classes": 2,
-    "loss_function": "cross_entropy",
     "optimizer": "Adam",
     "weight_decay": 0.01,
     "momentum": 0.9,
     "dropout": 0.3,
-
-    "MCdropout_test": false,
 
     "set_percentage_cv": 80,           
     "set_percentage_val": 20,           
@@ -38,14 +35,17 @@
     "calc_and_peak_test_error": false,
     
     "trainandtest": true,
-    "num_cv": 4, 
-    "only_x_cv": 4,                       
-    "epochs": 60,                      
-    "learning_rate": 3e-6,
+    "num_cv": 5, 
+    "only_x_cv": 5,                    
+    "epochs": 80,                      
+    "learning_rate": 1e-6,
     "scheduler_step_size": 1,
     "scheduler_gamma": 0.97,
+
+    "MCdropout_test": false,
+    "mc_iterations": 100,   
     
-    "early_stop_patience": 25,           
+    "early_stop_patience": 10,           
     "early_stop_accuracy": 7,          
     "data_augmentation": "6,7,9",
     "show_samples": true,
@@ -55,6 +55,7 @@
     "cart_or_pol": "orig",
     
     "auto_encoder": false,
+    "autenc_depth": 5,
     "encoder_group": "group_0",
     "encoder_name": "run_0",
     "compare_classifier_predictions": true
