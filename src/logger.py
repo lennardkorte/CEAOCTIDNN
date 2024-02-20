@@ -1,108 +1,56 @@
 
-import sys
-import json
-import numpy as np
+import os
+import csv
 
-class Logger(object):        
-    @staticmethod
-    def printer(title, config, eval_test, if_val_or_test = False):
-        print('\n' + title)
-        print("   Loss:          ", round(eval_test.mean_loss, config['early_stop_accuracy']))
-        if not config["auto_encoder"]:
-            print("   Accuracy:      ", round(eval_test.metrics[0], config['early_stop_accuracy']))
-            print("   Sensitivity:   ", round(eval_test.metrics[1], config['early_stop_accuracy']))
-            print("   Specificity:   ", round(eval_test.metrics[2], config['early_stop_accuracy']))
-            print("   F1:            ", round(eval_test.metrics[3], config['early_stop_accuracy']))
-            print("   BACC:          ", round(eval_test.metrics[4], config['early_stop_accuracy']))
-            print("   MCC:           ", round(eval_test.metrics[5], config['early_stop_accuracy']))
-            print("   Prec.:         ", round(eval_test.metrics[6], config['early_stop_accuracy']))
-        elif if_val_or_test:
-            np.set_printoptions(suppress=True, precision=4, floatmode='fixed')
-            print('TP:', eval_test.mse_loss_conf_matr_mean[1,1], 'TN:', eval_test.mse_loss_conf_matr_mean[0,0], 'FP:', eval_test.mse_loss_conf_matr_mean[1,0], 'FN:', eval_test.mse_loss_conf_matr_mean[0,1])
+class Logger():
 
-    def printer_ae(title, early_stop_accuracy, mean_loss):
-        print('\n' + title)
-        print("   Loss:        ", round(mean_loss, early_stop_accuracy))
+    commit = {}
+    enable_wandb = False
 
-    @staticmethod
-    def log_test(file_log_test_results, description, config, eval_test, if_val_or_test=False):
-            try:
-                # Try to open the JSON file for reading (if it exists)
-                with open(file_log_test_results, 'r') as json_file:
-                    existing_data = json.load(json_file)
-            except (FileNotFoundError, json.JSONDecodeError):
-                # If the file doesn't exist or is empty, initialize with an empty dictionary
-                existing_data = {}
+    @classmethod
+    def init(cls, cv, checkpoint, config):
+        cls.enable_wandb = config['enable_wandb']
+        if cls.enable_wandb:
+            import wandb
 
-            data_to_append = {
-                description: {
-                    'Loss': float(eval_test.mean_loss)
-                }
-            }
-            if not config["auto_encoder"]:
-                data_to_append[description].update({
-                    'Accuracy': float(eval_test.metrics[0]),
-                    'Sensitivity': float(eval_test.metrics[1]),
-                    'Specificity': float(eval_test.metrics[2]),
-                    'F1': float(eval_test.metrics[3]),
-                    'BACC': float(eval_test.metrics[4]),
-                    'MCC': float(eval_test.metrics[5]),
-                    'Prec.': float(eval_test.metrics[6])
-                })
-            elif if_val_or_test:
-                data_to_append[description].update({
-                    'mse_loss_conf_matr_mean': eval_test.mse_loss_conf_matr_mean.tolist(),
-                })
-            '''
-                data_to_append[description].update({
-                    'loss_TP': float(eval_test.mse_loss_conf_matr_mean[1,1]),
-                    'loss_TN': float(eval_test.mse_loss_conf_matr_mean[0,0]),
-                    'loss_FP': float(eval_test.mse_loss_conf_matr_mean[1,0]),
-                    'loss_FN': float(eval_test.mse_loss_conf_matr_mean[0,1])
-                })
-            '''
-            
-
-            # Update the existing data with the new data
-            existing_data.update(data_to_append)
-
-            # Write the updated data to the JSON file
-            with open(file_log_test_results, 'w') as json_file:
-                json.dump(existing_data, json_file, indent=4)
+            if config['wandb'] is not None :
+                os.environ['WANDB_API_KEY'] = config['wandb']
+            else:
+                raise AssertionError("W&B is missing API key argument from this program. See docs for more information.")
+                
+            wandb.init(
+                project=config['wb_project'],
+                entity='lennardkorte', # TODO: data privacy
+                group=config['group'],
+                id=checkpoint.wandb_id,
+                resume="allow",
+                name=config['name'] + '_cv_' + str(cv),
+                reinit=True,
+                dir=os.getenv("WANDB_DIR", config.save_path))
     
-    @staticmethod
-    def test_read(file_log_test_results, description, config, if_val_or_test=False):
-        try:
-            # Try to open the JSON file for reading (if it exists)
-            with open(file_log_test_results, 'r') as json_file:
-                existing_data = json.load(json_file)
+    @classmethod   
+    def get_id(cls):
+        import wandb
+        return wandb.util.generate_id()
 
-            data = existing_data[description]
-            
-            # Extract the loss value from the data
-            mean_loss = data.get('Loss')
-            
-            # Extract the metrics array from the data
-            metrics = []
-            mse_loss_conf_matr_mean = np.array([[0,0],[0,0]])
-            if not config["auto_encoder"]:
-                metrics = [
-                    float(data.get('Accuracy')),
-                    float(data.get('Sensitivity')),
-                    float(data.get('Specificity')),
-                    float(data.get('F1')),
-                    float(data.get('BACC')),
-                    float(data.get('MCC')),
-                    float(data.get('Prec.'))
-                ]
-            elif if_val_or_test:
-                mse_loss_conf_matr_mean = np.array(data.get('mse_loss_conf_matr_mean'))
-            
-            return mean_loss, metrics, mse_loss_conf_matr_mean
-
-        except (FileNotFoundError, json.JSONDecodeError):
-            print("JSON file not found or could not be decoded.")
-
+    @classmethod   
+    def add(cls, metrics:dict, prefix=None):   
+        pf = ''
+        if prefix is not None:
+            pf = prefix + ' ' 
+        for key, value in metrics.items():
+            cls.commit[pf + key] = value            
         
+    @classmethod
+    def push(cls, path):
+        with open(path, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=cls.commit.keys())
+            csvfile.seek(0, 2)
+            if csvfile.tell() == 0: writer.writeheader()
+            writer.writerow(cls.commit)
 
-    
+        if cls.enable_wandb:    
+            import wandb
+            wandb.log(cls.commit)
+        
+        cls.commit = {}

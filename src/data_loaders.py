@@ -6,7 +6,7 @@ class Dataloaders():
     @classmethod
     def _create_dataloader(cls, indices, cust_data, config, shuffle=False, drop_last=False, for_train=False, imgs_for=None):
         return DataLoader(
-            OCT_Dataset(indices, cust_data.label_data, cust_data.all_files_paths, for_train, config['preload'], config['dataset_no'], config['transformations_chosen']),
+            OCT_Dataset(indices, cust_data.label_data, cust_data.all_files_paths, for_train, config['preload'], config['dataset_no']),
             batch_size=config['batch_size'],
             shuffle=shuffle,
             num_workers=1,  #TODO: Adjust this as necessary, potentially len(config['gpus']) * 4

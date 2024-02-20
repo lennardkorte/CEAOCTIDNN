@@ -1,0 +1,19 @@
+
+{
+    "group": "classifier",
+    "wb_project": "CEAOCTIDNN",
+    "name": "run_06",
+    "show_samples": true,
+    "overwrite_run": false,
+    "overwrite_configurations": true,
+    "enable_wandb": false,
+    "epochs": 4,
+    "num_cv": 4,
+    "early_stop_patience": 10,
+    "learning_rate": 1e-6,
+    "scheduler_gamma": 0.97,
+    "dataset_no": 2,
+    "MCdropout_test": true,
+    "n_points": 3,
+    "only_x_cv": 1
+}

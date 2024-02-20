@@ -1,29 +1,33 @@
 
+import os
+import json
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-import math
+import pandas as pd
 import torch.nn as nn
+import matplotlib.pyplot as plt
 from pathlib import Path
-import os
+
+from tqdm import tqdm
 from PIL import Image
 from torchvision.transforms import ToPILImage
-from image_transforms import CircularMask
+#from image_transforms import CircularMask
 from scipy.stats import linregress
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, matthews_corrcoef
 
-from sklearn.metrics import confusion_matrix, f1_score, auc, roc_curve
 
 class Eval():
     def __init__(self, dataloader, device, model, config, save_path_cv, cv, checkpoint_name=None, class_weights=None):
         model.eval()
-        
-        n_passes = 1
-        if config['MCdropout_test']:
-            n_passes = 3
-            predictions_list = []
+        mc_iterator = range(1)
 
-        for _ in range(n_passes):
-            for i, (inputs, labels) in enumerate(dataloader):
+        mc_dropout_test = config['MCdropout_test'] and checkpoint_name is not None
+        if mc_dropout_test:
+            loss_linear_all_list = []
+            mc_iterator = tqdm(range(config['n_points']), total=config['n_points'], desc='MC Confidence Estimation')
+
+        for _ in mc_iterator:
+            for i, (inputs, labels) in tqdm(enumerate(dataloader), total=len(dataloader), desc='Evaluation (train peak & valid)', leave=False):
                 inputs = inputs.to(device)
                 labels_long = labels.type(torch.LongTensor).to(device)
                 labels = labels.to(device)
@@ -31,27 +35,26 @@ class Eval():
                 with torch.set_grad_enabled(False):
                     with torch.cuda.amp.autocast():
                         
-                        if config['MCdropout_test']: # TODO
+                        if mc_dropout_test:
                             for m in model.modules():
                                 if m.__class__.__name__.startswith('Dropout'):
                                     m.train()
-                                    print("yay")
-
-                            exit()
 
                         outputs = model(inputs)
                         
                         if config["auto_encoder"]:
                             mse_loss_function = nn.MSELoss(reduction='none')
                             loss_elementwise = mse_loss_function(outputs, inputs)
-                            loss_each = torch.mean(loss_elementwise, dim=[1,2,3]) # loss for each image in batch (8 floats for batch size 8)
+                            loss_each = torch.mean(loss_elementwise, dim=[1,2,3]) # loss_each is loss for each image in batch (8 floats for batch size 8)
                             
                             # Compute Loss without log # TODO: mask for training as well
                             me_loss_function = nn.L1Loss(reduction='none') # Mean Error
+                            '''
                             inputs = CircularMask(0.9)(inputs)
                             inputs = CircularMask(0.17, True)(inputs)
                             outputs = CircularMask(0.9)(outputs)
-                            outputs = CircularMask(0.17, True)(outputs)
+                            outputs = CircularMask(0.17, True)(outputs)'''
+
                             loss_linear_elementwise = me_loss_function(outputs, inputs)
                             loss_linear_each = torch.mean(loss_linear_elementwise, dim=[1,2,3])
                         else:
@@ -87,24 +90,26 @@ class Eval():
             targets_np = targets_all_tensor.cpu().numpy()
             predictions_np = predictions_all_tensor.cpu().numpy()
 
-            if config['MCdropout_test']: # TODO
-                predictions_list.append(predictions_np)
+            if mc_dropout_test:
+                loss_linear_all_list.append(loss_linear_all)
         
-        if config['MCdropout_test']: # TODO
+        if mc_dropout_test:
             # Compute entropy for each index
+            # loss to metrics?
+            # loss for autenc improvement estimation?
+            # average image channels after model
+            
+            losses = np.array(loss_linear_all_list)
+            variances = np.var(losses, axis=0)
 
-            variances = np.var(predictions_list, axis=0)
-            print(variances[0])
+            predicted_labels = np.argmax(predictions_np, axis=1)
+            df = pd.DataFrame({'true_labels': targets_np, 'predicted_labels': predicted_labels, 'variance': variances})
+            average_variances = df.groupby(['true_labels', 'predicted_labels'])['variance'].mean().unstack(fill_value=0)
+            average_variances_dict = average_variances.to_dict()
+            with open(save_path_cv / 'average_variances.json', 'w') as f:
+                json.dump(average_variances_dict, f, indent=4)
+            
             exit()
-            '''
-            entropies = []
-            for index in range(len(predictions_list[0])):
-                # Extract the specific index values across all predictions
-                index_values = [prediction[index] for prediction in predictions_list]
-                # Calculate entropy for this index
-                index_entropy = entropy(index_values)
-                entropies.append(index_entropy)
-            '''
 
         if not config["auto_encoder"]:
             self.metrics = self.calc_metrics(predictions_np, targets_all_tensor, config['num_classes'])
@@ -260,59 +265,39 @@ class Eval():
     
     def calc_metrics(self, predictions_np, targets, num_classes):
         
+        metrics = {
+            "bal_acc": 0.0,
+            "accuracy": 0.0,
+            "sens": 0.0,
+            "spec": 0.0,
+            "f1": 0.0,
+            "mcc": -1.0,
+            "prec": 0.0
+        }
+
         targets_np = targets.cpu().numpy()
+        predicted_classes = np.argmax(predictions_np, axis=1)
 
-        accuracy = np.mean(np.equal(np.argmax(predictions_np, 1), targets_np))
-        conf_matrix = confusion_matrix(targets_np, np.argmax(predictions_np, 1))
+        try:
+            metrics["accuracy"] = accuracy_score(targets_np, predicted_classes)
+            metrics["bal_acc"] = balanced_accuracy_score(targets_np, predicted_classes)
+            metrics["prec"] = precision_score(targets_np, predicted_classes, average='weighted', zero_division=0)
+            metrics["sens"] = recall_score(targets_np, predicted_classes, average='weighted', zero_division=0)
+            metrics["f1"] = f1_score(targets_np, predicted_classes, average='weighted', zero_division=0)
+            metrics["mcc"] = matthews_corrcoef(targets_np, predicted_classes)
 
-        weighted_accuracy = conf_matrix.diagonal() / conf_matrix.sum(axis=1)
-        sensitivity = np.zeros([num_classes])
-        specificity = np.zeros([num_classes])
-        if num_classes > 2:
-            # will currently result in error if not all classes are in test set...
-            if conf_matrix.shape[0] == num_classes:
-                for k in range(num_classes):
-                    sensitivity[k] = conf_matrix[k, k] / (np.sum(conf_matrix[k, :]))
-                    true_negative = np.delete(conf_matrix, [k], 0)
-                    true_negative = np.delete(true_negative, [k], 1)
-                    true_negative = np.sum(true_negative)
-                    false_positive = np.delete(conf_matrix, [k], 0)
-                    false_positive = np.sum(false_positive[:, k])
-                    specificity[k] = true_negative / (true_negative + false_positive)
-            else:
-                tn, fp, fn, tp = conf_matrix.ravel()
-                sensitivity = tp / (tp + fn)
-                specificity = tn / (tn + fp)
-            # F1 score
-            f1 = f1_score(targets_np, np.argmax(predictions_np, 1), average='weighted')
-        else:
-            tn, fp, fn, tp = conf_matrix.ravel() # TODO: raveling multiple times
-            sensitivity = tp / (tp + fn)
-            specificity = tn / (tn + fp)
-            # F1 score
-            f1 = f1_score(targets_np, np.argmax(predictions_np, 1))
-        # Balanced accuracy
-        bacc = (sensitivity + specificity) / 2
-        prec = tp / (tp + fp) if tp + fp != 0 else 0.0 #TODO: check zero div everywhere
-        # Matthews Correlation Coefficient
-        if (tp+fp) != 0 and (tp+fn) != 0 and (tn+fp) != 0 and (tn+fn) != 0:
-            mcc = ((tp * tn) - (fp * fn)) / math.sqrt( (tp+fp) * (tp+fn) * (tn+fp) * (tn+fn) )
-        else:
-            mcc = 0.0
-        # AUC
-        fpr = {}
-        tpr = {}
-        roc_auc = np.zeros([num_classes])
-        targets_one_hot = np.array(torch.nn.functional.one_hot(targets, num_classes).cpu().numpy())
-        for i in range(num_classes):
-            fpr[i], tpr[i], _ = roc_curve(targets_one_hot[:, i], predictions_np[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
+            # Computing specificity requires a confusion matrix
+            cm = confusion_matrix(targets_np, predicted_classes)
+            tn = cm[0, 0]
+            fp = cm[0, 1]
+            fn = cm[1, 0]
+            tp = cm[1, 1]
 
-        self.confusion_matrix = conf_matrix # TODO: unused
-        self.roc_auc = roc_auc # TODO: unused
-        self.weighted_accuracy = weighted_accuracy # TODO: unused
+            # Calculate specificity
+            metrics["spec"] = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        except Exception as e:
+            print(f"Error computing metrics: {e}")
 
-
-        return [accuracy, sensitivity, specificity, f1, bacc, mcc, prec]
-    
-    
+        return metrics
+        
+        

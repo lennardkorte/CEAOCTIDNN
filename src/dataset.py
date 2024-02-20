@@ -6,7 +6,7 @@ from tqdm import tqdm
 from PIL import Image
 
 class OCT_Dataset(Dataset):
-    def __init__(self, ind_set:list, label_data:np.ndarray, all_files_paths, for_train, preload, dataset_no, transformations_chosen):
+    def __init__(self, ind_set:list, label_data:np.ndarray, all_files_paths, for_train, preload, dataset_no):
         self.for_train = for_train
         self.preload = preload
         self.length = len(ind_set)
@@ -15,7 +15,6 @@ class OCT_Dataset(Dataset):
         self.chosen_file_paths = [all_files_paths[i] for i in ind_set]
         
         self.chosen_labels = label_data[ind_set].astype(np.float32)
-        self.transformations_chosen = transformations_chosen
 
         self.chosen_images = []
         if self.preload:
@@ -39,12 +38,12 @@ class OCT_Dataset(Dataset):
     
     def __getitem__(self, idx):        
         # Get the input data
-        if self.preload:
+        if self.preload: #TODO not working for jpg yet
             image = self.chosen_images[idx]
         else:
             image = self._load_image(self.chosen_file_paths[idx])
 
-        image_tensor = ImageTransforms.transform_image(image, self.transformations_chosen, self.for_train, self.dataset_no)
+        image_tensor = ImageTransforms.transform_image(image, self.for_train, self.dataset_no)
         
         label = self.chosen_labels[idx]
         

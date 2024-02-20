@@ -7,7 +7,7 @@
     "gpu": 0,
 
     "dataset_no": 1,
-    "sample_no": 10,
+    "sample_no": 20,
     
     "use_cuda": true,
     "deterministic_training": true,
@@ -31,17 +31,16 @@
     "preload": false,
     "batch_size": 8,
     
-    "enable_wandb": true,
+    "enable_wandb": false,
     "wb_project": "new_project",
-    "b_logging_active": false,
 
-    "calc_train_error": true,           
-    "peak_train_error": false,
+    "calc_train_error": true,
     "calc_and_peak_test_error": false,
     
     "trainandtest": true,
-    "num_cv": 4,                        
-    "epochs": 50,                      
+    "num_cv": 4, 
+    "only_x_cv": 4,                       
+    "epochs": 60,                      
     "learning_rate": 3e-6,
     "scheduler_step_size": 1,
     "scheduler_gamma": 0.97,

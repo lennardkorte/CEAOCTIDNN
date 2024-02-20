@@ -45,11 +45,9 @@ class DatasetPreparation():
                         if file.endswith(('.jpeg', '.jpg')):
                             full_path = os.path.join(root, file)
                             groups[self._extract_group_name(full_path)].add(full_path)
-
-                # Calculate the number of entries to remove
+                
                 total_entries = len(groups)
-                entries_to_remove = int(total_entries * 0.5)
-                # Remove the calculated number of entries from the dictionary
+                entries_to_remove = int(total_entries * 0.7)
                 keys_to_remove = random.sample(list(groups.keys()), entries_to_remove)
                 for key in keys_to_remove:
                     del groups[key]

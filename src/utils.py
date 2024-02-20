@@ -1,6 +1,5 @@
 
 import os
-import time
 import torch
 import random
 import json
@@ -12,7 +11,7 @@ from tqdm import tqdm
 from pathlib import Path
 from collections import OrderedDict
 
-from utils_wandb import Wandb
+from logger import Logger
 from dataset import OCT_Dataset
 from data_loaders import Dataloaders
 
@@ -71,15 +70,12 @@ class Utils():
             loss_function = nn.MSELoss()
         else:
             loss_function = nn.CrossEntropyLoss(weight=class_weights.to(device))
-
-        start_it_epoch = time.time()
+        
         model.train()
-        print('')
-
+        
         learning_rate_sum = 0
         loss_sum = 0
-
-        for j, (inputs, labels) in tqdm(enumerate(Dataloaders.training), total=len(Dataloaders.training), desc='Batches', leave=False):
+        for j, (inputs, labels) in tqdm(enumerate(Dataloaders.training), total=len(Dataloaders.training), desc='Training batches', leave=False):
             
             inputs = inputs.to(device)
             labels = labels.squeeze().type(torch.LongTensor).to(device)
@@ -115,14 +111,10 @@ class Utils():
                 # Updates the scale for next iteration.
                 scaler.update()
 
-                #print(optimizer.param_groups[0]['lr'])
                 learning_rate_sum += optimizer.param_groups[0]['lr']
                 loss_sum += loss_all
 
-        if config["enable_wandb"]:
-            Wandb.wandb_train_one_epoch(loss_sum / (j + 1), learning_rate_sum / (j + 1))
-        
-        return time.time() - start_it_epoch
+        Logger.add({"mean_loss": float(loss_sum / (j + 1)), "mean_learning_rate": learning_rate_sum / (j + 1)}, "train_set")
 
     @staticmethod
     def read_json(file_name):
@@ -140,8 +132,8 @@ def data_loader_sampling(cust_data, path, transf_chosen, dataset_no, sample_no):
     os.makedirs(path / 'sample_images', exist_ok=True)
     sample_ind = random.sample(range(len(cust_data.label_data)), sample_no)
     
-    dataset_prepro = OCT_Dataset(sample_ind, cust_data.label_data, cust_data.all_files_paths, False, False, dataset_no, transf_chosen)
-    dataset_prepro_and_aug = OCT_Dataset(sample_ind, cust_data.label_data, cust_data.all_files_paths, True, False, dataset_no, transf_chosen)
+    dataset_prepro = OCT_Dataset(sample_ind, cust_data.label_data, cust_data.all_files_paths, False, False, dataset_no)
+    dataset_prepro_and_aug = OCT_Dataset(sample_ind, cust_data.label_data, cust_data.all_files_paths, True, False, dataset_no)
 
     for i in range(sample_no):
         image_prepro, image_prepro_label = dataset_prepro[i]

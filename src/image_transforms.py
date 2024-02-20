@@ -879,6 +879,28 @@ class CircularMask(object):
             if self.invert:
                 self.mask = ~self.mask
 
+class MaxBrightnessToBlackTransform(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, img):
+        """
+        img: a PyTorch tensor of the image with shape (C, H, W) and values in [0, 1].
+        """
+        # Ensure img is a torch tensor
+        if not isinstance(img, torch.Tensor):
+            raise TypeError("Image must be a PyTorch tensor")
+
+        # Find the maximum pixel value across the entire image tensor
+        max_val = img.max()
+        
+        # Create a mask where the pixel value is equal to the max value
+        mask = img == max_val
+
+        # Set those pixels to black (0)
+        img[mask] = 0
+        
+        return img
 
 '''
 Concatenation
@@ -886,72 +908,58 @@ Concatenation
 '''
 class ImageTransforms():
     @classmethod
-    def compose_transforms(cls, image:np, transforms_ind_chosen:list, for_train:bool, dataset_no:int):
-        transforms_ind_chosen = transforms_ind_chosen if for_train else []
+    def compose_transforms(cls, image:np, for_train:bool, dataset_no:int):
         
-        # Set output shape according to selected transformations
-        output_shape = (224, 224)
-        #output_shape = image.shape
-        
-        custom_transforms = [
-            IdentityTransform(),
+        #custom_transforms = [
+            #IdentityTransform(),
             
             # Distorting filters
-            T.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),
+            #T.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),
             
             # Padding
             # : randomize
             #T.Pad(padding=0, fill=0, padding_mode='constant'), # other padding modes: edge, reflect, symmetric
             
             # Cropping: Crops the given image at the center. 
-            T.CenterCrop(size=200),
-            T.RandomCrop(size=image.shape, padding=10, fill=0, padding_mode='constant'), # edge, reflect or symmetric
+            #T.CenterCrop(size=200),
+            #T.RandomCrop(size=image.shape, padding=10, fill=0, padding_mode='constant'), # edge, reflect or symmetric
             
 
             # Positioning
             # -------------------------------------------
             # The following destroys determinism due to different worker seeds
-            T.RandomRotation(degrees=(-180,180), fill=0, interpolation=InterpolationMode.BILINEAR), # try center parameter random, interpolationmode has no effect on b/w image
-            T.RandomPerspective(distortion_scale=0.3, p=1.0, fill=0),
-            T.RandomHorizontalFlip(p=0.5),
-            T.RandomVerticalFlip(p=0.5),
+            #T.RandomRotation(degrees=(-180,180), fill=0, interpolation=InterpolationMode.BILINEAR), # try center parameter random, interpolationmode has no effect on b/w image
+            #T.RandomPerspective(distortion_scale=0.3, p=1.0, fill=0),
+            #T.RandomHorizontalFlip(p=0.5),
+            #T.RandomVerticalFlip(p=0.5),
 
             # Resizing, stretching, squeezing, repositioning
             #  :Randomize
             #T.Resize(size=(200,200)),
             # random crop, random aspect ratio, resize
-            T.RandomResizedCrop(size=image.shape, scale=(0.8, 1.0), ratio=(1.0, 1.0), antialias=True), # also used in Inception networks
+            #T.RandomResizedCrop(size=image.shape, scale=(0.8, 1.0), ratio=(1.0, 1.0), antialias=True), # also used in Inception networks
             # random rotation, random scale, repositioning
-            T.RandomAffine(degrees=(-180,180), translate=(0, 0), fill=0, interpolation=InterpolationMode.BILINEAR), #, scale=(0.8, 1.2)
+            #T.RandomAffine(degrees=(-180,180), translate=(0, 0), fill=0, interpolation=InterpolationMode.BILINEAR), #, scale=(0.8, 1.2)
             
             
             # Grayscaling
             # -------------------------------------------
-            T.ColorJitter(brightness=1, contrast=0, saturation=0, hue=0), # saturation and hue have no effect on b/w image
-            T.RandomInvert(p=0.5),
+            #T.ColorJitter(brightness=1, contrast=0, saturation=0, hue=0), # saturation and hue have no effect on b/w image
+            #T.RandomInvert(p=0.5),
             # Posterizing
-            RandomPosterize(bits=3, p=0.5),
+            #RandomPosterize(bits=3, p=0.5),
             
             # Later maybe
-            '''
-            - GAN
-            - RandomApply
-            - 
-            '''
+            # GAN
+            # RandomApply
             
             # No expected improvement for less data
-            '''
-            - T.RandomErase()
-            '''
-            
+            #T.RandomErase()
             
             # Not usable
-            '''
-            - Grayscale
-            - RandomGrayscale
-            
-            '''
-        ]
+            # Grayscale
+            # RandomGrayscale
+        #]
         da_before_pre_transform = [
             # DA New
             #MoveCurve(),
@@ -984,7 +992,6 @@ class ImageTransforms():
             #PartialMasking(),
         ]
         pre_transforms = [
-            
             #CLAHE(), #TODO
             #AddGaussianNoise2(),
             
@@ -993,9 +1000,6 @@ class ImageTransforms():
             # always
             ToFloat(),
             T.ToTensor(),
-            
-            
-            
 
             # preprozessing
             #MeanNormalization(),
@@ -1005,7 +1009,7 @@ class ImageTransforms():
             
         ]
         post_transforms = [
-            T.Resize(size=output_shape, antialias=True),
+            T.Resize(size=(224, 224), antialias=True),
             #AddGaussianNoise(0, 5000),
             #AddDoubleZeroPadding(),
             #CircularMask(), #TODO
@@ -1014,25 +1018,30 @@ class ImageTransforms():
             #Standardization_IN(),
             
         ]
-        after_da = [
-            PartialMasking(),
-        ]
-        transforms_chosen = list(map(custom_transforms.__getitem__, transforms_ind_chosen))
-        all_transforms = pre_transforms + transforms_chosen + post_transforms
-        if for_train:
-            all_transforms = da_before_pre_transform + pre_transforms + transforms_chosen + after_da + post_transforms
-        
+
+        da_techniques = []
         match dataset_no:
             case 1:
-                print("ok")
+                if for_train: da_techniques = [
+                    T.RandomAffine(degrees=(-180,180), translate=(0, 0), fill=0, interpolation=InterpolationMode.BILINEAR),
+                    MaxBrightnessToBlackTransform(),
+                    T.RandomHorizontalFlip(p=0.5),
+                    T.RandomVerticalFlip(p=0.5),
+                    PartialMasking(),
+                ]
+                all_transforms = pre_transforms + da_techniques + post_transforms
             case 2:
-                all_transforms = pre_transforms + post_transforms
+                if for_train: da_techniques = [
+                    #MaxBrightnessToBlackTransform(),
+                    T.RandomHorizontalFlip(p=0.5),
+                ]
+                all_transforms = pre_transforms + da_techniques + post_transforms
 
         composed_transforms = T.Compose(all_transforms)
         return composed_transforms
         
     @classmethod
-    def transform_image(cls, image:np.ndarray, transforms_ind_chosen:list, for_train:bool, dataset_no:int):
-        composed_transforms = cls.compose_transforms(image, transforms_ind_chosen, for_train, dataset_no)
+    def transform_image(cls, image, for_train, dataset_no):
+        composed_transforms = cls.compose_transforms(image, for_train, dataset_no)
         transformed_image = composed_transforms(image)
         return transformed_image
