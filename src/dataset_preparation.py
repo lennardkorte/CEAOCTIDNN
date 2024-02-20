@@ -47,7 +47,9 @@ class DatasetPreparation():
                             groups[self._extract_group_name(full_path)].add(full_path)
                 
                 total_entries = len(groups)
-                entries_to_remove = int(total_entries * 0.7)
+                entries_to_remove = int(total_entries * 0.95)
+                if config['deterministic_training']:
+                    random.seed(42)
                 keys_to_remove = random.sample(list(groups.keys()), entries_to_remove)
                 for key in keys_to_remove:
                     del groups[key]
@@ -60,6 +62,8 @@ class DatasetPreparation():
                 self.all_files_paths = []
                 self.label_data = np.array([])
                 for group in sorted_groups:
+                    if config['deterministic_training']:
+                        random.seed(42)
                     group_sample = random.sample(group, min(len(group), int(upper_limit)))
                     starting_index = len(self.all_files_paths)
                     self.all_files_paths.extend(group_sample)
