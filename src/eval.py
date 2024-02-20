@@ -98,7 +98,7 @@ class Eval():
                 else:
                     loss_all = loss_all_tensor.cpu().numpy()
                     mean_loss = np.mean(loss_all)
-                    self.metrics['loss'] = mean_loss
+                    self.metrics['mean_loss'] = float(mean_loss)
                     targets_np = targets_all_tensor.cpu().numpy()
                     if not config['auto_encoder']:
                         predictions_np = predictions_all_tensor.cpu().numpy()
@@ -108,17 +108,17 @@ class Eval():
                 
             if checkpoint_name is not None: # only given when testing best and last checkpoint
                 if not config["auto_encoder"]:
-                    classifier_predictions = np.argmax(predictions_np, 1)
+                    predicted_labels = np.argmax(predictions_np, axis=1)
                     if mc_dropout_test:
                         # determinist randomness                        
                         losses = np.array(loss_linear_all_list)
                         variances = np.var(losses, axis=0)
-                        self.uncertainty_confusion_matrix(variances, predictions_np, targets_np, save_path_cv / (checkpoint_name + '_avg_var.json'))
-                        self.loss_distribution_analysis(variances, loss_linear_all, classifier_predictions, targets_np, save_path_cv, checkpoint_name + '_' + 'variance')
+                        self.uncertainty_confusion_matrix(variances, predicted_labels, targets_np, save_path_cv / (checkpoint_name + '_avg_var.json'))
+                        self.loss_distribution_analysis(variances, loss_linear_all, predicted_labels, targets_np, save_path_cv, checkpoint_name + '_' + 'variance')
                     else:
                         predictions_file_name = save_path_cv / (checkpoint_name + '_predloss_pairs.txt')
                         with open(predictions_file_name, 'w') as file:
-                            for int_class, float_loss in zip(classifier_predictions,loss_linear_all):
+                            for int_class, float_loss in zip(predicted_labels,loss_linear_all):
                                 file.write(f"{int_class},{float_loss}\n")
 
                 else:
@@ -131,14 +131,15 @@ class Eval():
                             for line in file:
                                 parts = line.strip().split(',')
                                 classifier_predloss_pairs.append((int(parts[0]), float(parts[1])))
-                        classifier_predictions, classifier_losses = tuple(map(list, zip(*classifier_predloss_pairs)))
+                        predicted_labels, classifier_losses = tuple(map(list, zip(*classifier_predloss_pairs)))
+                        predicted_labels = np.array(predicted_labels)
+                        classifier_losses = np.array(classifier_losses)
                         
-                        self.uncertainty_confusion_matrix(loss_linear_all, classifier_predictions, targets_np, save_path_cv / (checkpoint_name + '_avg_autenc_loss.json'))
-                        self.loss_distribution_analysis(loss_linear_all, classifier_losses, classifier_predictions, targets_np, save_path_cv, checkpoint_name + '_' + 'CEB_loss')
+                        self.uncertainty_confusion_matrix(loss_linear_all, predicted_labels, targets_np, save_path_cv / (checkpoint_name + '_avg_autenc_loss.json'))
+                        self.loss_distribution_analysis(loss_linear_all, classifier_losses, predicted_labels, targets_np, save_path_cv, checkpoint_name + '_' + 'CEB_loss')
 
     @staticmethod
-    def uncertainty_confusion_matrix(uncertainty_indicator, predictions, targets, path):
-        predicted_labels = np.argmax(predictions, axis=1)
+    def uncertainty_confusion_matrix(uncertainty_indicator, predicted_labels, targets, path):
         df = pd.DataFrame({'true_labels': targets, 'predicted_labels': predicted_labels, 'variance': uncertainty_indicator})
         average_variances = df.groupby(['true_labels', 'predicted_labels'])['variance'].mean().unstack(fill_value=0)
         average_variances_dict = average_variances.to_dict()
@@ -146,7 +147,7 @@ class Eval():
             json.dump(average_variances_dict, f, indent=4)
 
     @staticmethod
-    def loss_distribution_analysis(ue_values, classifier_losses, classifier_predictions, targets_np, save_path_cv, store_name):
+    def loss_distribution_analysis(ue_values, classifier_losses, predicted_labels, targets_np, save_path_cv, store_name):
             # Apply Threshold
             classifier_losses = np.array(classifier_losses)
             #mask1 = np.array([elem > -1 for elem in classifier_losses])
@@ -158,7 +159,7 @@ class Eval():
 
             # Create plot Loss Pair Distribution of Classifier vs Autoencoder
             colors = np.array([])
-            for t, p in zip(targets_np, classifier_predictions): #colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_all_tensor, classifier_predictions)])
+            for t, p in zip(targets_np, predicted_labels): #colors = np.array([('green' if t == p else 'red') for t, p in zip(targets_all_tensor, classifier_predictions)])
                 color = 'green' if t == p else 'red' # TODO: colors not right
                 colors = np.append(colors, color)
             colors_threshold = colors[mask1 & mask2]
@@ -217,7 +218,7 @@ class Eval():
             for threshold in thresholds:
                 mask = ue_values < threshold
                 if np.sum(mask) > 0:  # Ensure there are samples below the threshold
-                    predictions_threshold = classifier_predictions[mask]
+                    predictions_threshold = predicted_labels[mask]
                     targets_threshold = targets_np[mask]
                     balanced_accuracy = balanced_accuracy_score(targets_threshold, predictions_threshold)
                 else:

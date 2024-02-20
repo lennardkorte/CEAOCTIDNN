@@ -113,8 +113,9 @@ class Utils():
 
                 learning_rate_sum += optimizer.param_groups[0]['lr']
                 loss_sum += loss_all
-
-        Logger.add({"mean_loss": float(loss_sum / (j + 1)), "mean_learning_rate": learning_rate_sum / (j + 1)}, "train_set")
+                
+        #"mean_loss training": float(np.float32(loss_sum / (j + 1))) #TODO: cannot be 
+        Logger.add({"mean_learning_rate": learning_rate_sum / (j + 1)}, "train_set")
 
     @staticmethod
     def read_json(file_name):

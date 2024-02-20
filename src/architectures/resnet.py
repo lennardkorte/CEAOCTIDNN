@@ -30,7 +30,7 @@ class ResNetAutoEncoder(nn.Module):
                 param.requires_grad = False
 
         if mirror:
-            self.decoder = ResNetDecoder(layer_cfg=layer_cfg[::-1], version=version, bottleneck=bottleneck, conv_trans=True, depth=depth)
+            self.decoder = ResNetDecoder(layer_cfg=layer_cfg[::-1], bottleneck=bottleneck, conv_trans=True, depth=depth)
         else:    
             self.decoder = ResNetDecoder(layer_cfg=[3, 4, 6, 3][::-1], bottleneck=True, conv_trans=False, depth=depth)
     

@@ -60,8 +60,17 @@ class Checkpoint():
     
     @classmethod
     def get_new_model(cls, device:device, config:Config, cv:int) -> DataParallel:
-        model = architecture_builder(config['architecture'], config['arch_version'], config['dropout'], config['num_classes'], config['autenc_depth'])
+        model = architecture_builder(
+            arch=config['architecture'],
+            version=config['arch_version'],
+            dropout=config['dropout'],
+            num_classes=config['num_classes'],
+            mirror=config['mirror'],
+            freeze_enc=config['freeze_enc'],
+            depth=config['autenc_depth'],
+            autenc=config['auto_encoder'])
         
+        '''
         # Load the pretrained ResNet model from a ".pt" file
         save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
         for path in glob(str(save_path_ae_cv / '*.pt')):
@@ -69,10 +78,13 @@ class Checkpoint():
                 checkpoint_path = path
                 checkpoint = torch.load(checkpoint_path)
                 # TODO only load layers that are the same in encoder
-                model.load_state_dict(checkpoint['model_state_dict'])
+                model.load_state_dict(checkpoint['model_state_dict'])'''
 
+
+
+        # TODO: Parallelize gpu computing
         '''
-        #if len(config['gpus']) > 1: #TODO
+        #if len(config['gpus']) > 1: 
         #    model = nn.DataParallel(model)
                 
         

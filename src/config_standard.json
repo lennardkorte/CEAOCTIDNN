@@ -58,5 +58,7 @@
     "autenc_depth": 5,
     "encoder_group": "group_0",
     "encoder_name": "run_0",
-    "compare_classifier_predictions": true
+    "compare_classifier_predictions": true,
+    "mirror": false,
+    "freeze_enc": true
 }
