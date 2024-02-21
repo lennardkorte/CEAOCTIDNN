@@ -69,18 +69,18 @@ class Checkpoint():
             freeze_enc=config['freeze_enc'],
             depth=config['autenc_depth'],
             autenc=config['auto_encoder'])
-        
-        '''
-        # Load the pretrained ResNet model from a ".pt" file
-        save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
-        for path in glob(str(save_path_ae_cv / '*.pt')):
-            if "checkpoint_best" in path:
-                checkpoint_path = path
-                checkpoint = torch.load(checkpoint_path)
-                # TODO only load layers that are the same in encoder
-                model.load_state_dict(checkpoint['model_state_dict'])'''
 
-
+        if config['auto_encoder'] and config['load_enc']:
+            save_path_ae_cv = Path('./data/train_and_test', config['encoder_group'], config['encoder_name'], ('cv_' + str(cv)))
+            for path in glob(str(save_path_ae_cv / '*.pt')):
+                if "checkpoint_best" in path:
+                    checkpoint_path = path
+                    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+                    print(checkpoint['model_state_dict'].items()[:10])
+                    exit()
+                    encoder_state_dict = {k: v for k, v in checkpoint['model_state_dict'].items() if k.startswith('encoder')}
+                    model.load_state_dict(encoder_state_dict, strict=False)
+                    model.load_state_dict(checkpoint['model_state_dict'])
 
         # TODO: Parallelize gpu computing
         '''
