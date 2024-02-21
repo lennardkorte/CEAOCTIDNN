@@ -1,17 +1,17 @@
 
 {
     "wb_project": "CEAOCTIDNN",
-    "enable_wandb": false,
+    "enable_wandb": true,
     
     "group": "classifier",
     "name": "resnet50v2",
-    "overwrite_run": true,
+    "overwrite_run": false,
     
-    "epochs": 4,
+    "epochs": 80,
     "num_cv": 5,
     "only_x_cv": 1,
     "dataset_no": 2,
 
     "MCdropout_test": true,
-    "mc_iterations": 10
+    "mc_iterations": 100
 }

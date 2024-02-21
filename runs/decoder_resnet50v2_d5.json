@@ -8,13 +8,14 @@
     "overwrite_run": true,
     
     "auto_encoder": true,
-    "model_type": "resnet50autenc",
     "autenc_depth": 5,
+    "freeze_enc": false,
     
     "encoder_group": "classifier",
     "encoder_name": "resnet50v2",
 
-    "epochs": 4,
+    "epochs": 2,
     "num_cv": 5,
-    "only_x_cv": 1
+    "only_x_cv": 1,
+    "dataset_no": 2
 }
