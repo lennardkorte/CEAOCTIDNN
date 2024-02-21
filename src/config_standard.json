@@ -46,8 +46,7 @@
     "mc_iterations": 100,   
     
     "early_stop_patience": 10,           
-    "early_stop_accuracy": 7,          
-    "data_augmentation": "6,7,9",
+    "early_stop_accuracy": 7,
     "show_samples": true,
     "binary_class": true,     
 
@@ -60,5 +59,6 @@
     "encoder_name": "run_0",
     "compare_classifier_predictions": true,
     "mirror": false,
-    "freeze_enc": true
+    "freeze_enc": true,
+    "load_enc": true
 }
