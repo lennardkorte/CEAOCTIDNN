@@ -45,14 +45,14 @@ class DatasetPreparation():
                         if file.endswith(('.jpeg', '.jpg')):
                             full_path = os.path.join(root, file)
                             groups[self._extract_group_name(full_path)].add(full_path)
-                
+                '''
                 total_entries = len(groups)
                 entries_to_remove = int(total_entries * 0.95)
                 if config['deterministic_training']:
                     random.seed(42)
                 keys_to_remove = random.sample(list(groups.keys()), entries_to_remove)
                 for key in keys_to_remove:
-                    del groups[key]
+                    del groups[key]'''
 
                 group_sizes = [len(group) for group in groups.values()]
                 upper_limit = statistics.mean(group_sizes) + statistics.stdev(group_sizes)
