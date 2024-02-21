@@ -1,6 +1,7 @@
 import sys
 import torch
 import torch.nn as nn
+from torchsummary import summary
 from pathlib import Path
 script_directory = Path(__file__).parent.resolve()
 if str(script_directory) not in sys.path:
@@ -307,6 +308,7 @@ if __name__ == "__main__":
     #summary(encoder)
     #summary(decoder)
     #summary(autenc)
+    #summary(model)
 
 
 

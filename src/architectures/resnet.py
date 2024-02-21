@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from torchsummary import summary
+
 
 def get_configs(arch):
 
@@ -716,3 +718,4 @@ if __name__ == "__main__":
     #summary(encoder)
     #summary(decoder)
     #summary(autenc)
+    #summary(model)
