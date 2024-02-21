@@ -109,8 +109,7 @@ class Eval():
             if checkpoint_name is not None: # only given when testing best and last checkpoint
                 if not config["auto_encoder"]:
                     predicted_labels = np.argmax(predictions_np, axis=1)
-                    if mc_dropout_test:
-                        # determinist randomness                        
+                    if mc_dropout_test:                      
                         losses = np.array(loss_linear_all_list)
                         variances = np.var(losses, axis=0)
                         self.uncertainty_confusion_matrix(variances, predicted_labels, targets_np, save_path_cv / (checkpoint_name + '_avg_var.json'))
