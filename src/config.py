@@ -47,14 +47,7 @@ class Config(dict):
         if config['trainandtest']: config.update({'trainandtest':args.trainandtest})
         if not config['overwrite_configurations']: config.update({'overwrite_configurations':args.overwrite_configurations})
         if not config['show_samples']: config.update({'show_samples':args.show_samples})
-            
-        # Sets / Overwrites the given config with the newly chosen Data Augmentation techniques
-        config['transformations_chosen'] = []
-        if args.data_augmentation is not None:
-            config['transformations_chosen'] += [int(x) for x in args.data_augmentation.split(',')]
-        if config['data_augmentation'] != "":
-            config['transformations_chosen'] += [int(x) for x in config['data_augmentation'].split(',')]
-        
+                
         # Given arguments overwrite all other configs.
         config.update({
             'wandb':args.wandb,
