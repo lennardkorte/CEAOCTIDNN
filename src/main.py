@@ -18,7 +18,7 @@ from sklearn.utils.class_weight import compute_class_weight
 def train_and_eval(config:Config):    
     cust_data = DatasetPreparation(config)
     if config['show_samples']:
-        data_loader_sampling(cust_data, config.save_path, config['transformations_chosen'], config["dataset_no"], config['sample_no'])
+        data_loader_sampling(cust_data, config.save_path, config["dataset_no"], config['sample_no'])
 
     Dataloaders.setup_data_loader_testset(cust_data, config)
     
@@ -133,7 +133,6 @@ if __name__ == '__main__':
     args.add_argument('-ntt', '--no_trainandtest', dest='trainandtest', action='store_false', help='Deactivation of Training and Testing (default: Activated)')
     args.add_argument('-smp', '--show_samples', dest='show_samples', action='store_true', help='Activate creation of Sample from Data Augmentation (default: Deactivated)')
     args.add_argument('-ycf', '--overwrite_configurations', dest='overwrite_configurations', action='store_true', help='Overwrite Configurations, if config file in this directory already exists. (default: False)')
-    args.add_argument('-da', '--data_augmentation', default=None, type=str, help='indices of Data Augmentation techniques to enable (default: None)')
     args.add_argument('-lr', '--learning_rate', default=3e-6, type=float, help='')
     args.add_argument('-wd', '--weight_decay', default=0.001, type=float, help='')
     args.add_argument('-mo', '--momentum', default=0.9, type=float, help='')
