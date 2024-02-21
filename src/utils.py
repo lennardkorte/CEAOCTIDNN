@@ -129,7 +129,7 @@ class Utils():
         with file_name.open('wt') as handle:
             json.dump(content, handle, indent=4, sort_keys=False)
 
-def data_loader_sampling(cust_data, path, transf_chosen, dataset_no, sample_no):
+def data_loader_sampling(cust_data, path, dataset_no, sample_no):
     os.makedirs(path / 'sample_images', exist_ok=True)
     sample_ind = random.sample(range(len(cust_data.label_data)), sample_no)
     
